@@ -222,6 +222,54 @@
   box-shadow: 0 4px 12px rgba(255, 255, 255, 0.3);
 }
 
+/* Nouveaux boutons pour options chaud/froid/ok */
+.vlm-button-option {
+  background: transparent;
+  color: #ffffff;
+  padding: 14px 24px;
+  min-width: 120px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.vlm-button-hot {
+  border-color: #ff6b6b;
+}
+
+.vlm-button-hot:hover {
+  background: #ff6b6b;
+  color: #ffffff;
+  border-color: #ff6b6b;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 16px rgba(255, 107, 107, 0.4);
+}
+
+.vlm-button-cold {
+  border-color: #74b9ff;
+}
+
+.vlm-button-cold:hover {
+  background: #74b9ff;
+  color: #ffffff;
+  border-color: #74b9ff;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 16px rgba(116, 185, 255, 0.4);
+}
+
+.vlm-button-ok {
+  border-color: #00b894;
+}
+
+.vlm-button-ok:hover {
+  background: #00b894;
+  color: #ffffff;
+  border-color: #00b894;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 16px rgba(0, 184, 148, 0.4);
+}
+
 @keyframes slideUpFade {
   from {
     opacity: 0;

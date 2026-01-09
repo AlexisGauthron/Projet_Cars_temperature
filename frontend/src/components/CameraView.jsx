@@ -1,7 +1,8 @@
 import React from 'react';
+import { TEMPERATURE_CONFIG } from '../config/temperature';
 import './CameraView.css';
 
-const CameraView = ({ videoRef, canvasRef, annotatedImage, emotion, error, vlmQuestion, onVLMResponse, temperature, primaryEmotion }) => {
+const CameraView = ({ videoRef, canvasRef, annotatedImage, emotion, error, vlmQuestion, vlmOptions, onVLMResponse, temperature, primaryEmotion }) => {
   // Afficher l'émotion du détecteur primary (FER): 'confortable' ou 'inconfortable'
   // Capitaliser la première lettre pour l'affichage
   const emotionLabel = primaryEmotion 
@@ -49,31 +50,60 @@ const CameraView = ({ videoRef, canvasRef, annotatedImage, emotion, error, vlmQu
                 <div className="temp-gauge-mini">
                   <div 
                     className="temp-gauge-mini-fill"
-                    style={{ height: `${(temperature / 50) * 100}%` }}
+                    style={{ height: `${TEMPERATURE_CONFIG.toGaugePercent(temperature)}%` }}
                   />
                 </div>
-                <span className="temp-value-mini">{temperature.toFixed(1)}°C</span>
+                <span className="temp-value-mini">{TEMPERATURE_CONFIG.format(temperature)}</span>
               </div>
             )}
 
-            {/* Question VLM avec boutons intégrés */}
+            {/* Question VLM avec boutons de réponse */}
             {vlmQuestion && (
               <div className="vlm-question-overlay">
                 <div className="vlm-question-box">
                   <p className="vlm-question-text">{vlmQuestion}</p>
                   <div className="vlm-action-buttons">
-                    <button
-                      className="vlm-button vlm-button-yes"
-                      onClick={() => onVLMResponse('oui')}
-                    >
-                      OUI
-                    </button>
-                    <button
-                      className="vlm-button vlm-button-no"
-                      onClick={() => onVLMResponse('non')}
-                    >
-                      NON
-                    </button>
+                    {vlmOptions && vlmOptions.length > 0 ? (
+                      // Nouveaux boutons avec options dynamiques
+                      vlmOptions.map((option, index) => {
+                        const optionLower = option.toLowerCase();
+                        // Déterminer le type de bouton
+                        const isHot = optionLower.includes('chaud') || optionLower === 'baisser';
+                        const isCold = optionLower.includes('froid') || optionLower === 'augmenter';
+                        const isOk = optionLower.includes('va') || optionLower.includes('bon');
+
+                        return (
+                          <button
+                            key={index}
+                            className={`vlm-button vlm-button-option vlm-button-${
+                              isHot ? 'hot' : isCold ? 'cold' : 'ok'
+                            }`}
+                            onClick={() => onVLMResponse(option)}
+                          >
+                            {isHot && '🔥 '}
+                            {isCold && '❄️ '}
+                            {isOk && '✓ '}
+                            {option}
+                          </button>
+                        );
+                      })
+                    ) : (
+                      // Fallback: boutons Oui/Non classiques
+                      <>
+                        <button
+                          className="vlm-button vlm-button-yes"
+                          onClick={() => onVLMResponse('oui')}
+                        >
+                          OUI
+                        </button>
+                        <button
+                          className="vlm-button vlm-button-no"
+                          onClick={() => onVLMResponse('non')}
+                        >
+                          NON
+                        </button>
+                      </>
+                    )}
                   </div>
                 </div>
               </div>
