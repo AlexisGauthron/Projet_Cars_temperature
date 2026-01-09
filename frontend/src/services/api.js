@@ -1,14 +1,27 @@
 import axios from 'axios';
+import { API_CONFIG } from '../config/api';
 
-const API_BASE_URL = 'http://localhost:8000/api';
+// Instance Axios avec configuration par défaut
+const apiClient = axios.create({
+  baseURL: API_CONFIG.BASE_URL,
+  timeout: API_CONFIG.TIMEOUT.DEFAULT,
+});
 
 export const api = {
-  async sendFrame(imageBase64, temperature) {
+  /**
+   * Envoie une frame pour analyse d'émotions.
+   */
+  async sendFrame(imageBase64, temperature, mode = 'single') {
     try {
-      const response = await axios.post(`${API_BASE_URL}/frame`, {
-        image: imageBase64,
-        temperature: temperature
-      });
+      const response = await apiClient.post(
+        API_CONFIG.ENDPOINTS.FRAME,
+        {
+          image: imageBase64,
+          temperature: temperature,
+          mode: mode,
+        },
+        { timeout: API_CONFIG.TIMEOUT.FRAME }
+      );
       return response.data;
     } catch (error) {
       console.error('Erreur envoi frame:', error);
@@ -16,9 +29,15 @@ export const api = {
     }
   },
 
+  /**
+   * Vérifie s'il y a une question VLM à afficher.
+   */
   async checkVLM() {
     try {
-      const response = await axios.get(`${API_BASE_URL}/vlm-check`);
+      const response = await apiClient.get(
+        API_CONFIG.ENDPOINTS.VLM_CHECK,
+        { timeout: API_CONFIG.TIMEOUT.VLM }
+      );
       return response.data;
     } catch (error) {
       console.error('Erreur VLM check:', error);
@@ -26,15 +45,20 @@ export const api = {
     }
   },
 
+  /**
+   * Envoie la réponse utilisateur à une question VLM.
+   */
   async sendVLMResponse(userResponse) {
     try {
-      const response = await axios.post(`${API_BASE_URL}/vlm-response`, {
-        response: userResponse
-      });
+      const response = await apiClient.post(
+        API_CONFIG.ENDPOINTS.VLM_RESPONSE,
+        { response: userResponse },
+        { timeout: API_CONFIG.TIMEOUT.VLM }
+      );
       return response.data;
     } catch (error) {
       console.error('Erreur VLM response:', error);
       throw error;
     }
-  }
+  },
 };
