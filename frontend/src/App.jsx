@@ -1,20 +1,26 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import CameraView from './components/CameraView';
+import ModeToggle from './components/ModeToggle';
 import { useCamera } from './hooks/useCamera';
 import { api } from './services/api';
+import { TIMING_CONFIG } from './config/timing';
+import { TEMPERATURE_CONFIG } from './config/temperature';
 import './App.css';
 
 function App() {
   const { videoRef, canvasRef, captureFrame, error } = useCamera();
-  
-  const [temperature, setTemperature] = useState(20);
+
+  const [temperature, setTemperature] = useState(TEMPERATURE_CONFIG.DEFAULT);
   const temperatureRef = useRef(temperature);
   const [currentEmotion, setCurrentEmotion] = useState('');
   const [annotatedImage, setAnnotatedImage] = useState(null);
   const [primaryEmotion, setPrimaryEmotion] = useState('');
   const [vlmQuestion, setVlmQuestion] = useState(null);
+  const [vlmOptions, setVlmOptions] = useState(null);
   const [isWaitingVLM, setIsWaitingVLM] = useState(false);
   const [lastVLMCheck, setLastVLMCheck] = useState(Date.now());
+  const [detectionMode, setDetectionMode] = useState('single'); // 'single' ou 'multi'
+  const [facesSummary, setFacesSummary] = useState(null);
 
   // Synchroniser la ref avec le state
   useEffect(() => {
@@ -27,23 +33,21 @@ function App() {
     if (!frameData) return;
 
     try {
-      const result = await api.sendFrame(frameData, temperatureRef.current);
-      
+      const result = await api.sendFrame(frameData, temperatureRef.current, detectionMode);
+
       setCurrentEmotion(result.emotion);
       setAnnotatedImage(result.annotated_image);
-      
-      // Debug: voir ce qui arrive du backend
-      console.log('Backend result:', result);
-      console.log('Primary emotion received:', result.primary_emotion);
-      
+
       // Mettre à jour l'émotion du détecteur primary (FER) si disponible
       if (result.primary_emotion !== undefined) {
         setPrimaryEmotion(result.primary_emotion);
-        console.log('Primary emotion (FER) updated to:', result.primary_emotion);
-      } else {
-        console.warn('No primary_emotion in backend result');
       }
-      
+
+      // Mettre à jour le résumé des visages
+      if (result.faces_summary) {
+        setFacesSummary(result.faces_summary);
+      }
+
       // Mettre à jour la température avec celle du backend !
       if (result.temperature !== undefined) {
         setTemperature(result.temperature);
@@ -51,20 +55,21 @@ function App() {
     } catch (err) {
       console.error('Erreur traitement frame:', err);
     }
-  }, [captureFrame]);
+  }, [captureFrame, detectionMode]);
 
   // 🧠 VLM Check
   const checkVLM = useCallback(async () => {
     if (isWaitingVLM) return;
 
     const elapsed = Date.now() - lastVLMCheck;
-    if (elapsed < 5000) return;
+    if (elapsed < TIMING_CONFIG.VLM_COOLDOWN_MS) return;
 
     try {
       const result = await api.checkVLM();
-      
+
       if (result.question) {
         setVlmQuestion(result.question);
+        setVlmOptions(result.options || null);
         setIsWaitingVLM(true);
       } else {
         setLastVLMCheck(Date.now());
@@ -76,30 +81,40 @@ function App() {
 
   const handleVLMResponse = async (response) => {
     console.log('[VLM Response] User clicked:', response);
-    
+
     try {
-      // Envoyer la réponse au backend (le backend gérera l'ajustement progressif)
-      await api.sendVLMResponse(response);
-      
+      const result = await api.sendVLMResponse(response);
+
       setVlmQuestion(null);
+      setVlmOptions(null);
       setIsWaitingVLM(false);
       setLastVLMCheck(Date.now());
-      
-      console.log('[VLM Response] Response sent to backend, temperature will be adjusted server-side');
+
+      // Mettre à jour la température si elle a changé
+      if (result.new_temperature !== null && result.new_temperature !== undefined) {
+        setTemperature(result.new_temperature);
+      }
+
+      console.log('[VLM Response] Response sent to backend');
     } catch (err) {
       console.error('[VLM Response] Error:', err);
     }
   };
 
-  // RF-DETR Analysis à 20 FPS
+  const handleModeChange = (newMode) => {
+    setDetectionMode(newMode);
+    setFacesSummary(null); // Reset summary when changing mode
+  };
+
+  // Analyse des frames (5 FPS par défaut - configurable dans config/timing.js)
   useEffect(() => {
-    const frameInterval = setInterval(processFrame, 50);
+    const frameInterval = setInterval(processFrame, TIMING_CONFIG.FRAME_INTERVAL_MS);
     return () => clearInterval(frameInterval);
   }, [processFrame]);
 
-  // VLM Check toutes les secondes
+  // VLM Check (toutes les 2s par défaut - configurable dans config/timing.js)
   useEffect(() => {
-    const vlmInterval = setInterval(checkVLM, 1000);
+    const vlmInterval = setInterval(checkVLM, TIMING_CONFIG.VLM_CHECK_INTERVAL_MS);
     return () => clearInterval(vlmInterval);
   }, [checkVLM]);
 
@@ -111,7 +126,7 @@ function App() {
             <img src="/Stellantis.png" alt="Stellantis" />
           </div>
           <h1 className="app-title">CARE</h1>
-          <div></div>
+          <ModeToggle mode={detectionMode} onModeChange={handleModeChange} />
         </div>
       </header>
 
@@ -123,12 +138,13 @@ function App() {
           emotion={currentEmotion}
           error={error}
           vlmQuestion={vlmQuestion}
+          vlmOptions={vlmOptions}
           onVLMResponse={handleVLMResponse}
           temperature={temperature}
           primaryEmotion={primaryEmotion}
+          facesSummary={facesSummary}
+          detectionMode={detectionMode}
         />
-        
-        {/* Slider de température enlevé - la température change automatiquement */}
       </div>
     </div>
   );
