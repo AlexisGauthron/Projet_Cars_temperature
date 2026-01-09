@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { CAMERA_CONFIG } from '../config/camera';
 
 export const useCamera = () => {
   const videoRef = useRef(null);
@@ -8,10 +9,10 @@ export const useCamera = () => {
 
   useEffect(() => {
     startCamera();
-    
+
     return () => {
       if (stream) {
-        stream.getTracks().forEach(track => track.stop());
+        stream.getTracks().forEach((track) => track.stop());
       }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -19,18 +20,18 @@ export const useCamera = () => {
 
   const startCamera = async () => {
     try {
-      const mediaStream = await navigator.mediaDevices.getUserMedia({
-        video: { width: 640, height: 480 }
-      });
-      
+      const mediaStream = await navigator.mediaDevices.getUserMedia(
+        CAMERA_CONFIG.getConstraints()
+      );
+
       if (videoRef.current) {
         videoRef.current.srcObject = mediaStream;
       }
-      
+
       setStream(mediaStream);
       setError(null);
     } catch (err) {
-      setError('Impossible d\'accéder à la caméra');
+      setError("Impossible d'accéder à la caméra");
       console.error('Erreur caméra:', err);
     }
   };
@@ -43,13 +44,13 @@ export const useCamera = () => {
 
     const video = videoRef.current;
     const canvas = canvasRef.current;
-    
+
     // Vérifier que la vidéo est prête
     if (video.readyState !== video.HAVE_ENOUGH_DATA) {
       console.warn('Vidéo pas encore prête:', video.readyState);
       return null;
     }
-    
+
     if (video.videoWidth === 0 || video.videoHeight === 0) {
       console.warn('Dimensions vidéo invalides');
       return null;
@@ -58,17 +59,17 @@ export const useCamera = () => {
     const context = canvas.getContext('2d');
     canvas.width = video.videoWidth;
     canvas.height = video.videoHeight;
-    
+
     try {
       context.drawImage(video, 0, 0);
-      const dataURL = canvas.toDataURL('image/jpeg', 0.8);
-      
+      const dataURL = canvas.toDataURL('image/jpeg', CAMERA_CONFIG.JPEG_QUALITY);
+
       // Vérifier que le dataURL est valide
       if (!dataURL || dataURL === 'data:,') {
         console.error('DataURL invalide généré');
         return null;
       }
-      
+
       return dataURL;
     } catch (err) {
       console.error('Erreur capture frame:', err);
@@ -80,6 +81,6 @@ export const useCamera = () => {
     videoRef,
     canvasRef,
     captureFrame,
-    error
+    error,
   };
 };
