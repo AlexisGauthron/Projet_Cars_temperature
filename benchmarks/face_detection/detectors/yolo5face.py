@@ -22,6 +22,7 @@ class YOLO5FaceDetector(BaseDetector):
     name = "YOLO5Face"
 
     def __init__(self):
+        super().__init__()
         self.model = None
 
         try:
@@ -31,6 +32,7 @@ class YOLO5FaceDetector(BaseDetector):
             model_path = MODELS_DIR / "yolo5face" / "yolov5n-face.pt"
             if model_path.exists():
                 self.model = YOLO(str(model_path))
+                self._log_init_success()
             else:
                 # Alternative: utiliser le modèle YOLOv8-face comme fallback
                 # car YOLO5Face original nécessite une installation spécifique
@@ -43,19 +45,22 @@ class YOLO5FaceDetector(BaseDetector):
                             filename="yolov5n-face.pt"
                         )
                         self.model = YOLO(model_file)
-                    except Exception:
+                        self._log_init_success()
+                    except Exception as e:
+                        self._logger.debug(f"yolo5-face download failed: {e}")
                         # Fallback sur YOLOv8-face
                         model_file = hf_hub_download(
                             repo_id="arnabdhar/YOLOv8-Face-Detection",
                             filename="model.pt"
                         )
                         self.model = YOLO(model_file)
-                except Exception:
-                    pass
-        except ImportError:
-            pass
-        except Exception:
-            pass
+                        self._log_init_success()
+                except Exception as e:
+                    self._log_init_error(e)
+        except ImportError as e:
+            self._log_init_error(e)
+        except Exception as e:
+            self._log_init_error(e)
 
     def detect(self, image: np.ndarray) -> List[BBox]:
         if self.model is None:
@@ -72,7 +77,8 @@ class YOLO5FaceDetector(BaseDetector):
                         if w > 10 and h > 10 and conf > 0.3:
                             boxes.append(BBox(int(x1), int(y1), w, h, confidence=conf))
             return boxes
-        except Exception:
+        except Exception as e:
+            self._log_detection_error(e)
             return []
 
     def is_available(self) -> bool:

@@ -30,10 +30,15 @@ class TinaFaceDetector(BaseDetector):
     name = "TinaFace"
 
     def __init__(self):
+        super().__init__()
         self.detector = None
         self.onnx_session = None
         self.cfg = None
         self._try_load_model()
+        if self.is_available():
+            self._log_init_success()
+        else:
+            self._log_init_error(ImportError("Neither ONNX nor mmdetection model available"))
 
     def _try_load_model(self):
         """Try to load TinaFace model."""
@@ -59,12 +64,12 @@ class TinaFaceDetector(BaseDetector):
                     providers=['CPUExecutionProvider']
                 )
                 return
-            except Exception:
-                pass
-        except ImportError:
-            pass
-        except Exception:
-            pass
+            except Exception as e:
+                self._logger.debug(f"HuggingFace download failed: {e}")
+        except ImportError as e:
+            self._logger.debug(f"onnxruntime not available: {e}")
+        except Exception as e:
+            self._logger.debug(f"ONNX load failed: {e}")
 
         # Method 2: Via mmdetection/vedadet (complex)
         try:
@@ -80,10 +85,10 @@ class TinaFaceDetector(BaseDetector):
                     device='cpu'
                 )
                 return
-        except ImportError:
-            pass
-        except Exception:
-            pass
+        except ImportError as e:
+            self._logger.debug(f"mmdetection not available: {e}")
+        except Exception as e:
+            self._logger.debug(f"mmdetection init failed: {e}")
 
     def _preprocess(self, image: np.ndarray, target_size: int = 1100):
         """Preprocess image for ONNX inference."""
@@ -153,7 +158,8 @@ class TinaFaceDetector(BaseDetector):
                 input_name = self.onnx_session.get_inputs()[0].name
                 outputs = self.onnx_session.run(None, {input_name: input_tensor})
                 return self._decode_output(outputs, scale)
-            except Exception:
+            except Exception as e:
+                self._log_detection_error(e)
                 return []
 
         # Method 2: mmdetection
@@ -176,7 +182,8 @@ class TinaFaceDetector(BaseDetector):
                     if w > 10 and h > 10:
                         boxes.append(BBox(int(x1), int(y1), w, h, confidence=float(conf)))
                 return boxes
-            except Exception:
+            except Exception as e:
+                self._log_detection_error(e)
                 return []
 
         return []

@@ -21,6 +21,7 @@ class YOLOv12FaceDetector(BaseDetector):
     name = "YOLOv12-face"
 
     def __init__(self):
+        super().__init__()
         self.model = None
 
         try:
@@ -30,6 +31,7 @@ class YOLOv12FaceDetector(BaseDetector):
             model_path = MODELS_DIR / "yolov12" / "yolov12n-face.pt"
             if model_path.exists():
                 self.model = YOLO(str(model_path))
+                self._log_init_success()
             else:
                 # Télécharger depuis HuggingFace si disponible
                 try:
@@ -39,13 +41,14 @@ class YOLOv12FaceDetector(BaseDetector):
                         filename="yolov12n-face.pt"
                     )
                     self.model = YOLO(model_file)
-                except Exception:
+                    self._log_init_success()
+                except Exception as e:
                     # Pas de fallback - les modèles génériques détectent des personnes, pas des visages
-                    pass
-        except ImportError:
-            pass
-        except Exception:
-            pass
+                    self._log_init_error(e)
+        except ImportError as e:
+            self._log_init_error(e)
+        except Exception as e:
+            self._log_init_error(e)
 
     def detect(self, image: np.ndarray) -> List[BBox]:
         if self.model is None:
@@ -62,7 +65,8 @@ class YOLOv12FaceDetector(BaseDetector):
                         if w > 10 and h > 10 and conf > 0.3:
                             boxes.append(BBox(int(x1), int(y1), w, h, confidence=conf))
             return boxes
-        except Exception:
+        except Exception as e:
+            self._log_detection_error(e)
             return []
 
     def is_available(self) -> bool:

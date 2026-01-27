@@ -23,6 +23,7 @@ class YOLOv11FaceAdamCoddDetector(BaseDetector):
     name = "YOLOv11-face-AdamCodd"
 
     def __init__(self):
+        super().__init__()
         self.model = None
 
         try:
@@ -32,6 +33,7 @@ class YOLOv11FaceAdamCoddDetector(BaseDetector):
             model_path = MODELS_DIR / "yolov11" / "yolov11n-face-adamcodd.pt"
             if model_path.exists():
                 self.model = YOLO(str(model_path))
+                self._log_init_success()
             else:
                 # Télécharger depuis HuggingFace (AdamCodd)
                 try:
@@ -41,12 +43,13 @@ class YOLOv11FaceAdamCoddDetector(BaseDetector):
                         filename="model.pt"
                     )
                     self.model = YOLO(model_file)
-                except Exception:
-                    pass
-        except ImportError:
-            pass
-        except Exception:
-            pass
+                    self._log_init_success()
+                except Exception as e:
+                    self._log_init_error(e)
+        except ImportError as e:
+            self._log_init_error(e)
+        except Exception as e:
+            self._log_init_error(e)
 
     def detect(self, image: np.ndarray) -> List[BBox]:
         if self.model is None:
@@ -63,7 +66,8 @@ class YOLOv11FaceAdamCoddDetector(BaseDetector):
                         if w > 10 and h > 10 and conf > 0.3:
                             boxes.append(BBox(int(x1), int(y1), w, h, confidence=conf))
             return boxes
-        except Exception:
+        except Exception as e:
+            self._log_detection_error(e)
             return []
 
     def is_available(self) -> bool:

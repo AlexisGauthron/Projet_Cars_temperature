@@ -29,9 +29,14 @@ class CenterFaceDetector(BaseDetector):
     name = "CenterFace"
 
     def __init__(self):
+        super().__init__()
         self.detector = None
         self.onnx_session = None
         self._try_load_model()
+        if self.is_available():
+            self._log_init_success()
+        else:
+            self._log_init_error(ImportError("Neither centerface nor ONNX model available"))
 
     def _try_load_model(self):
         """Try to load CenterFace model."""
@@ -40,10 +45,10 @@ class CenterFaceDetector(BaseDetector):
             from centerface import CenterFace
             self.detector = CenterFace()
             return
-        except ImportError:
-            pass
-        except Exception:
-            pass
+        except ImportError as e:
+            self._logger.debug(f"centerface package not available: {e}")
+        except Exception as e:
+            self._logger.debug(f"centerface init failed: {e}")
 
         # Method 2: Via ONNX model
         try:
@@ -66,12 +71,12 @@ class CenterFaceDetector(BaseDetector):
                     model_file,
                     providers=['CPUExecutionProvider']
                 )
-            except Exception:
-                pass
-        except ImportError:
-            pass
-        except Exception:
-            pass
+            except Exception as e:
+                self._logger.debug(f"HuggingFace download failed: {e}")
+        except ImportError as e:
+            self._logger.debug(f"onnxruntime not available: {e}")
+        except Exception as e:
+            self._logger.debug(f"ONNX load failed: {e}")
 
     def _preprocess(self, image: np.ndarray, target_size: int = 640):
         """Preprocess image for ONNX inference."""
@@ -135,7 +140,8 @@ class CenterFaceDetector(BaseDetector):
                     if w > 10 and h > 10:
                         boxes.append(BBox(int(x1), int(y1), w, h, confidence=float(score)))
                 return boxes
-            except Exception:
+            except Exception as e:
+                self._log_detection_error(e)
                 return []
 
         # Method 2: ONNX inference
@@ -153,7 +159,8 @@ class CenterFaceDetector(BaseDetector):
                     # Simplified output
                     heatmap = outputs[0]
                     return self._decode_output(heatmap, scale, outputs[1] if len(outputs) > 1 else None, None)
-            except Exception:
+            except Exception as e:
+                self._log_detection_error(e)
                 return []
 
         return []

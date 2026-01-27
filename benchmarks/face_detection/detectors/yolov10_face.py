@@ -22,6 +22,7 @@ class YOLOv10FaceDetector(BaseDetector):
     name = "YOLOv10-face"
 
     def __init__(self):
+        super().__init__()
         self.model = None
 
         try:
@@ -31,6 +32,7 @@ class YOLOv10FaceDetector(BaseDetector):
             model_path = MODELS_DIR / "yolov10" / "yolov10n-face.pt"
             if model_path.exists():
                 self.model = YOLO(str(model_path))
+                self._log_init_success()
             else:
                 # Télécharger depuis HuggingFace
                 try:
@@ -41,7 +43,9 @@ class YOLOv10FaceDetector(BaseDetector):
                         filename="best.pt"
                     )
                     self.model = YOLO(model_file)
-                except Exception:
+                    self._log_init_success()
+                except Exception as e:
+                    self._logger.debug(f"hanungaddi download failed: {e}")
                     # Fallback: kairess/baby-face-detection-yolov10
                     try:
                         model_file = hf_hub_download(
@@ -49,12 +53,13 @@ class YOLOv10FaceDetector(BaseDetector):
                             filename="best.pt"
                         )
                         self.model = YOLO(model_file)
-                    except Exception:
-                        pass
-        except ImportError:
-            pass
-        except Exception:
-            pass
+                        self._log_init_success()
+                    except Exception as e2:
+                        self._log_init_error(e2)
+        except ImportError as e:
+            self._log_init_error(e)
+        except Exception as e:
+            self._log_init_error(e)
 
     def detect(self, image: np.ndarray) -> List[BBox]:
         if self.model is None:
@@ -71,7 +76,8 @@ class YOLOv10FaceDetector(BaseDetector):
                         if w > 10 and h > 10 and conf > 0.3:
                             boxes.append(BBox(int(x1), int(y1), w, h, confidence=conf))
             return boxes
-        except Exception:
+        except Exception as e:
+            self._log_detection_error(e)
             return []
 
     def is_available(self) -> bool:

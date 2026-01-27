@@ -29,8 +29,14 @@ class DSFDDetector(BaseDetector):
     name = "DSFD"
 
     def __init__(self):
+        super().__init__()
         self.detector = None
+        self.onnx_session = None
         self._try_load_model()
+        if self.is_available():
+            self._log_init_success()
+        else:
+            self._log_init_error(ImportError("Neither face_detection nor ONNX model available"))
 
     def _try_load_model(self):
         """Try to load DSFD model."""
@@ -43,10 +49,10 @@ class DSFDDetector(BaseDetector):
                 nms_iou_threshold=0.3
             )
             return
-        except ImportError:
-            pass
-        except Exception:
-            pass
+        except ImportError as e:
+            self._logger.debug(f"face_detection package not available: {e}")
+        except Exception as e:
+            self._logger.debug(f"face_detection init failed: {e}")
 
         # Method 2: Via ONNX model
         try:
@@ -59,10 +65,10 @@ class DSFDDetector(BaseDetector):
                 )
                 self.detector = "onnx"
                 return
-        except ImportError:
-            pass
-        except Exception:
-            pass
+        except ImportError as e:
+            self._logger.debug(f"onnxruntime not available: {e}")
+        except Exception as e:
+            self._logger.debug(f"ONNX load failed: {e}")
 
     def detect(self, image: np.ndarray) -> List[BBox]:
         if self.detector is None:
@@ -86,7 +92,8 @@ class DSFDDetector(BaseDetector):
             else:
                 # ONNX inference (fallback)
                 return self._detect_onnx(image)
-        except Exception:
+        except Exception as e:
+            self._log_detection_error(e)
             return []
 
     def _detect_onnx(self, image: np.ndarray) -> List[BBox]:

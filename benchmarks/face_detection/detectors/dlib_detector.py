@@ -26,15 +26,17 @@ class DLibHOGDetector(BaseDetector):
     name = "DLib-HOG"
 
     def __init__(self):
+        super().__init__()
         self.detector = None
 
         try:
             import dlib
             self.detector = dlib.get_frontal_face_detector()
-        except ImportError:
-            pass
-        except Exception:
-            pass
+            self._log_init_success()
+        except ImportError as e:
+            self._log_init_error(e)
+        except Exception as e:
+            self._log_init_error(e)
 
     def detect(self, image: np.ndarray) -> List[BBox]:
         if self.detector is None or cv2 is None:
@@ -52,7 +54,8 @@ class DLibHOGDetector(BaseDetector):
                 )
                 for f in faces
             ]
-        except Exception:
+        except Exception as e:
+            self._log_detection_error(e)
             return []
 
     def is_available(self) -> bool:
@@ -65,6 +68,7 @@ class DLibCNNDetector(BaseDetector):
     name = "DLib-CNN"
 
     def __init__(self):
+        super().__init__()
         self.detector = None
 
         try:
@@ -73,10 +77,13 @@ class DLibCNNDetector(BaseDetector):
             model_path = MODELS_DIR / "dlib" / "mmod_human_face_detector.dat"
             if model_path.exists():
                 self.detector = dlib.cnn_face_detection_model_v1(str(model_path))
-        except ImportError:
-            pass
-        except Exception:
-            pass
+                self._log_init_success()
+            else:
+                self._log_init_error(FileNotFoundError(f"Model not found: {model_path}"))
+        except ImportError as e:
+            self._log_init_error(e)
+        except Exception as e:
+            self._log_init_error(e)
 
     def detect(self, image: np.ndarray) -> List[BBox]:
         if self.detector is None:
@@ -95,7 +102,8 @@ class DLibCNNDetector(BaseDetector):
                 )
                 for f in faces
             ]
-        except Exception:
+        except Exception as e:
+            self._log_detection_error(e)
             return []
 
     def is_available(self) -> bool:

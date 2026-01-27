@@ -28,8 +28,13 @@ class BaseSCRFDDetector(BaseDetector):
     model_file: Optional[str] = None  # ONNX model filename
 
     def __init__(self):
+        super().__init__()
         self.detector = None
         self._try_load_model()
+        if self.is_available():
+            self._log_init_success()
+        else:
+            self._log_init_error(ImportError("SCRFD model not available"))
 
     def _try_load_model(self):
         """Try to load the SCRFD model."""
@@ -42,8 +47,8 @@ class BaseSCRFDDetector(BaseDetector):
                     self.detector = get_model(str(model_path))
                     self.detector.prepare(ctx_id=-1, input_size=(640, 640))
                     return
-            except Exception:
-                pass
+            except Exception as e:
+                self._logger.debug(f"Direct ONNX load failed: {e}")
 
             # Try downloading from insightface model zoo
             try:
@@ -53,8 +58,8 @@ class BaseSCRFDDetector(BaseDetector):
                 self.detector = get_model(model_name)
                 self.detector.prepare(ctx_id=-1, input_size=(640, 640))
                 return
-            except Exception:
-                pass
+            except Exception as e:
+                self._logger.debug(f"Model zoo download failed: {e}")
 
         # Method 2: FaceAnalysis with specific model pack
         try:
@@ -67,8 +72,8 @@ class BaseSCRFDDetector(BaseDetector):
             self.app.prepare(ctx_id=-1, det_size=(640, 640))
             self.detector = self.app
             return
-        except Exception:
-            pass
+        except Exception as e:
+            self._logger.debug(f"FaceAnalysis init failed: {e}")
 
     def detect(self, image: np.ndarray) -> List[BBox]:
         if self.detector is None:
@@ -97,7 +102,8 @@ class BaseSCRFDDetector(BaseDetector):
                     if w > 0 and h > 0:
                         boxes.append(BBox(int(x1), int(y1), w, h, confidence=float(conf)))
                 return boxes
-        except Exception:
+        except Exception as e:
+            self._log_detection_error(e)
             return []
 
     def is_available(self) -> bool:

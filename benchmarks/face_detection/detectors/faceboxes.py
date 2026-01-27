@@ -29,9 +29,14 @@ class FaceBoxesDetector(BaseDetector):
     name = "FaceBoxes"
 
     def __init__(self):
+        super().__init__()
         self.detector = None
         self.onnx_session = None
         self._try_load_model()
+        if self.is_available():
+            self._log_init_success()
+        else:
+            self._log_init_error(ImportError("Neither face_detection nor ONNX model available"))
 
     def _try_load_model(self):
         """Try to load FaceBoxes model."""
@@ -44,10 +49,10 @@ class FaceBoxesDetector(BaseDetector):
                 nms_iou_threshold=0.3
             )
             return
-        except (ImportError, ValueError):
-            pass
-        except Exception:
-            pass
+        except (ImportError, ValueError) as e:
+            self._logger.debug(f"face_detection package not available: {e}")
+        except Exception as e:
+            self._logger.debug(f"face_detection init failed: {e}")
 
         # Method 2: Via ONNX model
         try:
@@ -70,12 +75,12 @@ class FaceBoxesDetector(BaseDetector):
                     model_file,
                     providers=['CPUExecutionProvider']
                 )
-            except Exception:
-                pass
-        except ImportError:
-            pass
-        except Exception:
-            pass
+            except Exception as e:
+                self._logger.debug(f"HuggingFace download failed: {e}")
+        except ImportError as e:
+            self._logger.debug(f"onnxruntime not available: {e}")
+        except Exception as e:
+            self._logger.debug(f"ONNX load failed: {e}")
 
     def _preprocess(self, image: np.ndarray, target_size: int = 1024):
         """Preprocess image for FaceBoxes ONNX."""
@@ -114,7 +119,8 @@ class FaceBoxesDetector(BaseDetector):
                     if w > 10 and h > 10:
                         boxes.append(BBox(int(x1), int(y1), w, h, confidence=float(conf)))
                 return boxes
-            except Exception:
+            except Exception as e:
+                self._log_detection_error(e)
                 return []
 
         # Method 2: ONNX inference
@@ -137,7 +143,8 @@ class FaceBoxesDetector(BaseDetector):
                     if w > 10 and h > 10:
                         boxes.append(BBox(int(x1), int(y1), w, h, confidence=float(conf)))
                 return boxes
-            except Exception:
+            except Exception as e:
+                self._log_detection_error(e)
                 return []
 
         return []
