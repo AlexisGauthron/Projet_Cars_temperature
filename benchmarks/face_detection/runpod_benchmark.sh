@@ -36,7 +36,8 @@ MODE="strict"
 FAST_MODE=false
 
 # Liste des datasets disponibles
-ALL_DATASETS="wider_face mafa sviro"
+# sviro_subset est inclus dans git (1000 images JPG)
+ALL_DATASETS="wider_face mafa sviro_subset"
 
 # -----------------------------------------------------------------------------
 # Parsing des arguments
@@ -109,7 +110,7 @@ while [[ $# -gt 0 ]]; do
             echo "  --fast            Exclure les modèles lents (MTCNN, RetinaFace...)"
             echo "  --standard        Mode standard (pas strict)"
             echo ""
-            echo "Datasets disponibles: wider_face, mafa, sviro (ou 'all' pour tous)"
+            echo "Datasets disponibles: wider_face, mafa, sviro_subset (ou 'all' pour tous)"
             echo ""
             echo "Exemples:"
             echo "  $0                            # Strict sur TOUS les datasets"
