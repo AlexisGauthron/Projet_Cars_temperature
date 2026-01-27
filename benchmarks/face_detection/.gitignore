@@ -8,6 +8,9 @@ datasets/mafa/
 datasets/sviro/
 datasets/temp_download/
 
+# SVIRO subset (1000 images JPG) - INCLUS dans git
+!datasets/sviro_subset/
+
 # Résultats de benchmark
 results/*.json
 

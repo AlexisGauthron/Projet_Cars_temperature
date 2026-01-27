@@ -7,6 +7,7 @@ from .base import BaseDataset
 from .wider_face import WiderFaceDataset
 from .mafa import MAFADataset
 from .sviro import SVIRODataset, SVIROBMWi3Dataset, SVIROTeslaDataset
+from .sviro_subset import SVIROSubsetDataset
 
 # Registry des datasets
 DATASET_REGISTRY = {
@@ -15,6 +16,7 @@ DATASET_REGISTRY = {
     "sviro": SVIRODataset,
     "sviro_bmw_i3": SVIROBMWi3Dataset,
     "sviro_tesla": SVIROTeslaDataset,
+    "sviro_subset": SVIROSubsetDataset,
 }
 
 
@@ -58,6 +60,7 @@ __all__ = [
     "SVIRODataset",
     "SVIROBMWi3Dataset",
     "SVIROTeslaDataset",
+    "SVIROSubsetDataset",
     "get_dataset",
     "list_datasets",
     "DATASET_REGISTRY",
