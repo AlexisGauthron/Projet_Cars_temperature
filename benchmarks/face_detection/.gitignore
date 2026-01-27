@@ -1,0 +1,24 @@
+# Modèles (volumineux)
+models/
+!models/.gitkeep
+
+# Datasets (très volumineux)
+datasets/wider_face/
+datasets/mafa/
+datasets/sviro/
+datasets/temp_download/
+
+# Résultats de benchmark
+results/*.json
+
+# Cache Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Logs
+logs/*.log
+
+# Fichiers temporaires
+*.tmp
+*.bak

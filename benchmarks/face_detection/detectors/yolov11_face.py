@@ -1,0 +1,69 @@
+# -*- coding: utf-8 -*-
+"""
+YOLOv11 Face detector - deepghs/akanametov variant.
+Precision: 85.2%, Recall: 58.1%, mAP50: 66.5%.
+Source: https://huggingface.co/deepghs/yolo-face
+"""
+
+from typing import List
+import numpy as np
+
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).parent.parent))
+from core.structures import BBox
+from config import MODELS_DIR
+from .base import BaseDetector
+
+
+class YOLOv11FaceDetector(BaseDetector):
+    """YOLOv11 Face detector - Latest YOLO version."""
+
+    name = "YOLOv11-face"
+
+    def __init__(self):
+        self.model = None
+
+        try:
+            from ultralytics import YOLO
+
+            # Essayer de charger un modèle local
+            model_path = MODELS_DIR / "yolov11" / "yolov11n-face.pt"
+            if model_path.exists():
+                self.model = YOLO(str(model_path))
+            else:
+                # Télécharger depuis HuggingFace (deepghs/yolo-face)
+                try:
+                    from huggingface_hub import hf_hub_download
+                    model_file = hf_hub_download(
+                        repo_id="deepghs/yolo-face",
+                        filename="yolov11n-face/model.pt"
+                    )
+                    self.model = YOLO(model_file)
+                except Exception:
+                    pass
+        except ImportError:
+            pass
+        except Exception:
+            pass
+
+    def detect(self, image: np.ndarray) -> List[BBox]:
+        if self.model is None:
+            return []
+        try:
+            results = self.model(image, verbose=False)
+            boxes = []
+            for result in results:
+                if result.boxes is not None:
+                    for box in result.boxes:
+                        x1, y1, x2, y2 = box.xyxy[0].cpu().numpy()
+                        conf = float(box.conf[0].cpu().numpy())
+                        w, h = int(x2 - x1), int(y2 - y1)
+                        if w > 10 and h > 10 and conf > 0.3:
+                            boxes.append(BBox(int(x1), int(y1), w, h, confidence=conf))
+            return boxes
+        except Exception:
+            return []
+
+    def is_available(self) -> bool:
+        return self.model is not None

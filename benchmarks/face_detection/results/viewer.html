@@ -1,0 +1,1098 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Benchmark Face Detection - Viewer Pro</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --bg-primary: #0f172a;
+            --bg-secondary: #1e293b;
+            --bg-card: #334155;
+            --text-primary: #f1f5f9;
+            --text-secondary: #94a3b8;
+            --accent: #3b82f6;
+            --accent-hover: #2563eb;
+            --success: #22c55e;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --purple: #8b5cf6;
+            --border: #475569;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 2rem;
+            padding-bottom: 2rem;
+            border-bottom: 1px solid var(--border);
+        }
+
+        header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 0.5rem;
+            background: linear-gradient(135deg, var(--accent), #8b5cf6);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        header p {
+            color: var(--text-secondary);
+        }
+
+        /* Drop Zone */
+        .drop-zone {
+            border: 3px dashed var(--border);
+            border-radius: 1rem;
+            padding: 3rem;
+            text-align: center;
+            transition: all 0.3s ease;
+            cursor: pointer;
+            margin-bottom: 2rem;
+        }
+
+        .drop-zone:hover, .drop-zone.dragover {
+            border-color: var(--accent);
+            background: rgba(59, 130, 246, 0.1);
+        }
+
+        .drop-zone-icon { font-size: 4rem; margin-bottom: 1rem; }
+        .drop-zone h3 { margin-bottom: 0.5rem; }
+        .drop-zone p { color: var(--text-secondary); font-size: 0.9rem; }
+        #file-input { display: none; }
+        #results { display: none; }
+
+        /* Meta Info */
+        .meta-info {
+            background: var(--bg-secondary);
+            border-radius: 0.75rem;
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+            display: flex;
+            gap: 2rem;
+            flex-wrap: wrap;
+        }
+
+        .meta-item {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .meta-item span:first-child { color: var(--text-secondary); }
+
+        /* Section */
+        .section {
+            background: var(--bg-secondary);
+            border-radius: 0.75rem;
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .section h2 {
+            font-size: 1.5rem;
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        /* Key Metrics Cards */
+        .key-metrics {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+
+        .metric-card {
+            background: var(--bg-card);
+            border-radius: 0.75rem;
+            padding: 1.5rem;
+            text-align: center;
+            border-left: 4px solid var(--accent);
+        }
+
+        .metric-card.precision { border-left-color: var(--success); }
+        .metric-card.recall { border-left-color: var(--accent); }
+        .metric-card.f1 { border-left-color: var(--purple); }
+        .metric-card.fp { border-left-color: var(--danger); }
+
+        .metric-card .label {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            margin-bottom: 0.5rem;
+        }
+
+        .metric-card .value {
+            font-size: 2rem;
+            font-weight: bold;
+        }
+
+        .metric-card .model {
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+            margin-top: 0.25rem;
+        }
+
+        .metric-card.precision .value { color: var(--success); }
+        .metric-card.recall .value { color: var(--accent); }
+        .metric-card.f1 .value { color: var(--purple); }
+        .metric-card.fp .value { color: var(--danger); }
+
+        /* Ranking */
+        .ranking {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1rem;
+        }
+
+        .ranking-card {
+            background: var(--bg-card);
+            border-radius: 0.75rem;
+            padding: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            transition: transform 0.2s ease;
+        }
+
+        .ranking-card:hover { transform: translateY(-2px); }
+        .ranking-card.gold { background: linear-gradient(135deg, #fef3c7, #f59e0b); color: #78350f; }
+        .ranking-card.silver { background: linear-gradient(135deg, #e2e8f0, #94a3b8); color: #1e293b; }
+        .ranking-card.bronze { background: linear-gradient(135deg, #fed7aa, #ea580c); color: #7c2d12; }
+
+        .medal { font-size: 2.5rem; }
+        .ranking-info { flex: 1; }
+        .ranking-info h3 { font-size: 1.25rem; margin-bottom: 0.25rem; }
+        .ranking-info p { font-size: 0.9rem; opacity: 0.8; }
+        .ranking-score { font-size: 1.5rem; font-weight: bold; }
+
+        /* Table */
+        .table-container { overflow-x: auto; }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.9rem;
+        }
+
+        th, td {
+            padding: 0.75rem 1rem;
+            text-align: left;
+            border-bottom: 1px solid var(--border);
+        }
+
+        th {
+            background: var(--bg-card);
+            cursor: pointer;
+            user-select: none;
+            white-space: nowrap;
+            font-size: 0.85rem;
+        }
+
+        th:hover { background: var(--border); }
+        th.sorted-asc::after { content: ' ▲'; font-size: 0.7rem; }
+        th.sorted-desc::after { content: ' ▼'; font-size: 0.7rem; }
+        tr:hover td { background: var(--bg-card); }
+
+        .value-good { color: var(--success); font-weight: 600; }
+        .value-medium { color: var(--warning); }
+        .value-bad { color: var(--danger); }
+
+        .fp-badge {
+            display: inline-block;
+            padding: 0.25rem 0.5rem;
+            border-radius: 0.25rem;
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+
+        .fp-low { background: rgba(34, 197, 94, 0.2); color: var(--success); }
+        .fp-medium { background: rgba(245, 158, 11, 0.2); color: var(--warning); }
+        .fp-high { background: rgba(239, 68, 68, 0.2); color: var(--danger); }
+
+        /* Charts Grid */
+        .charts-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(450px, 1fr));
+            gap: 1.5rem;
+        }
+
+        .chart-card {
+            background: var(--bg-card);
+            border-radius: 0.75rem;
+            padding: 1.5rem;
+        }
+
+        .chart-card h3 { margin-bottom: 1rem; font-size: 1.1rem; }
+        .chart-container { position: relative; height: 350px; }
+
+        /* Recommendations */
+        .recommendations {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 1rem;
+        }
+
+        .recommendation-card {
+            background: var(--bg-card);
+            border-radius: 0.75rem;
+            padding: 1.5rem;
+            border-left: 4px solid var(--accent);
+        }
+
+        .recommendation-card.precision { border-left-color: var(--success); }
+        .recommendation-card.speed { border-left-color: var(--warning); }
+        .recommendation-card.balanced { border-left-color: var(--purple); }
+        .recommendation-card.low-fp { border-left-color: var(--danger); }
+
+        .recommendation-card h3 {
+            margin-bottom: 0.5rem;
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+        }
+
+        .recommendation-card .model-name {
+            font-size: 1.4rem;
+            font-weight: bold;
+            margin-bottom: 0.5rem;
+        }
+
+        .recommendation-card p {
+            color: var(--text-secondary);
+            font-size: 0.85rem;
+        }
+
+        .recommendation-card .stats {
+            display: flex;
+            gap: 1rem;
+            margin-top: 0.75rem;
+            flex-wrap: wrap;
+        }
+
+        .recommendation-card .stat {
+            font-size: 0.8rem;
+            padding: 0.25rem 0.5rem;
+            background: var(--bg-secondary);
+            border-radius: 0.25rem;
+        }
+
+        /* Difficulty Section */
+        .difficulty-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 1rem;
+        }
+
+        @media (max-width: 900px) {
+            .difficulty-grid { grid-template-columns: 1fr; }
+            .charts-grid { grid-template-columns: 1fr; }
+        }
+
+        .difficulty-card {
+            background: var(--bg-card);
+            border-radius: 0.75rem;
+            padding: 1.5rem;
+        }
+
+        .difficulty-card h3 {
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .difficulty-card.easy h3 { color: var(--success); }
+        .difficulty-card.medium h3 { color: var(--warning); }
+        .difficulty-card.hard h3 { color: var(--danger); }
+
+        .difficulty-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 0.5rem 0;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .difficulty-item:last-child { border-bottom: none; }
+
+        /* Footer */
+        footer {
+            text-align: center;
+            padding: 2rem;
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+        }
+
+        /* Buttons */
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.75rem 1.5rem;
+            background: var(--accent);
+            color: white;
+            border: none;
+            border-radius: 0.5rem;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: background 0.2s ease;
+        }
+
+        .btn:hover { background: var(--accent-hover); }
+        .btn-secondary { background: var(--bg-card); }
+        .btn-secondary:hover { background: var(--border); }
+
+        .actions {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 1rem;
+            flex-wrap: wrap;
+        }
+
+        /* Speed indicator */
+        .speed-indicator {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.25rem;
+            padding: 0.25rem 0.5rem;
+            border-radius: 0.25rem;
+            font-size: 0.8rem;
+            font-weight: 500;
+        }
+
+        .speed-realtime { background: rgba(34, 197, 94, 0.2); color: var(--success); }
+        .speed-slow { background: rgba(239, 68, 68, 0.2); color: var(--danger); }
+
+        /* Tabs */
+        .tabs {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 0.5rem;
+        }
+
+        .tab {
+            padding: 0.5rem 1rem;
+            background: transparent;
+            border: none;
+            color: var(--text-secondary);
+            cursor: pointer;
+            border-radius: 0.25rem;
+            transition: all 0.2s;
+        }
+
+        .tab:hover { background: var(--bg-card); color: var(--text-primary); }
+        .tab.active { background: var(--accent); color: white; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Benchmark Face Detection</h1>
+            <p>Analyse des performances - Focus sur la Precision et les Faux Positifs</p>
+        </header>
+
+        <!-- Drop Zone -->
+        <div class="drop-zone" id="drop-zone">
+            <div class="drop-zone-icon">📊</div>
+            <h3>Glissez-deposez un fichier JSON</h3>
+            <p>ou cliquez pour selectionner un fichier</p>
+            <input type="file" id="file-input" accept=".json">
+        </div>
+
+        <!-- Results -->
+        <div id="results">
+            <!-- Meta Info -->
+            <div class="meta-info" id="meta-info">
+                <div class="meta-item">
+                    <span>📅 Date:</span>
+                    <strong id="meta-date">-</strong>
+                </div>
+                <div class="meta-item">
+                    <span>🤖 Modeles:</span>
+                    <strong id="meta-models">-</strong>
+                </div>
+                <div class="meta-item">
+                    <span>🖼️ Images:</span>
+                    <strong id="meta-images">-</strong>
+                </div>
+                <div class="meta-item">
+                    <span>👤 Visages GT:</span>
+                    <strong id="meta-faces">-</strong>
+                </div>
+            </div>
+
+            <!-- Key Metrics Summary -->
+            <div class="key-metrics" id="key-metrics"></div>
+
+            <!-- Actions -->
+            <div class="actions">
+                <button class="btn" onclick="exportCSV()">📥 Exporter CSV</button>
+                <button class="btn btn-secondary" onclick="location.reload()">🔄 Charger autre fichier</button>
+            </div>
+
+            <!-- Recommendations -->
+            <div class="section">
+                <h2>💡 Recommandations</h2>
+                <div class="recommendations" id="recommendations"></div>
+            </div>
+
+            <!-- Ranking Section -->
+            <div class="section">
+                <h2>🏆 Classement</h2>
+                <div class="tabs">
+                    <button class="tab active" onclick="switchRanking('precision')">Par Precision</button>
+                    <button class="tab" onclick="switchRanking('recall')">Par Recall</button>
+                    <button class="tab" onclick="switchRanking('f1')">Par F1-Score</button>
+                    <button class="tab" onclick="switchRanking('fp')">Moins de FP</button>
+                </div>
+                <div class="ranking" id="ranking"></div>
+            </div>
+
+            <!-- Comparison Table -->
+            <div class="section">
+                <h2>📋 Tableau Comparatif Complet</h2>
+                <div class="table-container">
+                    <table id="comparison-table">
+                        <thead>
+                            <tr>
+                                <th data-sort="name">Modele</th>
+                                <th data-sort="precision">Precision ↑</th>
+                                <th data-sort="recall">Recall ↑</th>
+                                <th data-sort="f1">F1-Score ↑</th>
+                                <th data-sort="ap">AP ↑</th>
+                                <th data-sort="tp">TP</th>
+                                <th data-sort="fp">FP ↓</th>
+                                <th data-sort="fn">FN</th>
+                                <th data-sort="time">Temps (ms)</th>
+                                <th data-sort="fps">FPS</th>
+                                <th>Temps Reel</th>
+                            </tr>
+                        </thead>
+                        <tbody id="table-body"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Charts -->
+            <div class="section">
+                <h2>📈 Visualisations</h2>
+                <div class="charts-grid">
+                    <div class="chart-card">
+                        <h3>Precision vs Recall vs F1</h3>
+                        <div class="chart-container">
+                            <canvas id="metrics-chart"></canvas>
+                        </div>
+                    </div>
+                    <div class="chart-card">
+                        <h3>Faux Positifs (FP) par Modele</h3>
+                        <div class="chart-container">
+                            <canvas id="fp-chart"></canvas>
+                        </div>
+                    </div>
+                    <div class="chart-card">
+                        <h3>Precision vs Vitesse (Pareto)</h3>
+                        <div class="chart-container">
+                            <canvas id="tradeoff-chart"></canvas>
+                        </div>
+                    </div>
+                    <div class="chart-card">
+                        <h3>TP / FP / FN par Modele</h3>
+                        <div class="chart-container">
+                            <canvas id="confusion-chart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Difficulty Section -->
+            <div class="section">
+                <h2>🎯 Recall par Difficulte</h2>
+                <div class="difficulty-grid">
+                    <div class="difficulty-card easy">
+                        <h3>✅ Easy</h3>
+                        <div id="difficulty-easy"></div>
+                    </div>
+                    <div class="difficulty-card medium">
+                        <h3>⚠️ Medium</h3>
+                        <div id="difficulty-medium"></div>
+                    </div>
+                    <div class="difficulty-card hard">
+                        <h3>❌ Hard</h3>
+                        <div id="difficulty-hard"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <footer>
+            <p>Benchmark Face Detection - ProjectCare DMS | Focus: Minimiser les Faux Positifs</p>
+        </footer>
+    </div>
+
+    <script>
+        let benchmarkData = null;
+        let charts = {};
+        let currentRankingMode = 'precision';
+
+        // Drop zone handling
+        const dropZone = document.getElementById('drop-zone');
+        const fileInput = document.getElementById('file-input');
+
+        dropZone.addEventListener('click', () => fileInput.click());
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.classList.add('dragover');
+        });
+        dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('dragover');
+            const file = e.dataTransfer.files[0];
+            if (file) loadFile(file);
+        });
+        fileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) loadFile(file);
+        });
+
+        function loadFile(file) {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    benchmarkData = JSON.parse(e.target.result);
+                    displayResults();
+                } catch (err) {
+                    alert('Erreur de lecture du fichier JSON: ' + err.message);
+                }
+            };
+            reader.readAsText(file);
+        }
+
+        function displayResults() {
+            document.getElementById('drop-zone').style.display = 'none';
+            document.getElementById('results').style.display = 'block';
+
+            const results = benchmarkData.results;
+            const models = Object.keys(results);
+
+            // Meta info
+            document.getElementById('meta-date').textContent = benchmarkData.benchmark_info?.last_updated || benchmarkData.benchmark_date || '-';
+            document.getElementById('meta-models').textContent = models.length;
+            const firstModel = results[models[0]];
+            document.getElementById('meta-images').textContent = firstModel?.total_images || '-';
+            document.getElementById('meta-faces').textContent = firstModel?.total_gt_faces || '-';
+
+            // Display all sections
+            displayKeyMetrics(models, results);
+            displayRecommendations(models, results);
+            displayRanking(models, results, 'precision');
+            displayTable(models, results);
+            displayCharts(models, results);
+            displayDifficulty(models, results);
+        }
+
+        function displayKeyMetrics(models, results) {
+            const container = document.getElementById('key-metrics');
+
+            // Find best models for each metric
+            const bestPrecision = models.reduce((a, b) => results[a].precision > results[b].precision ? a : b);
+            const bestRecall = models.reduce((a, b) => results[a].recall > results[b].recall ? a : b);
+            const bestF1 = models.reduce((a, b) => results[a].f1_score > results[b].f1_score ? a : b);
+            const lowestFP = models.reduce((a, b) => results[a].fp < results[b].fp ? a : b);
+
+            container.innerHTML = `
+                <div class="metric-card precision">
+                    <div class="label">🎯 Meilleure Precision</div>
+                    <div class="value">${(results[bestPrecision].precision * 100).toFixed(1)}%</div>
+                    <div class="model">${bestPrecision}</div>
+                </div>
+                <div class="metric-card recall">
+                    <div class="label">📡 Meilleur Recall</div>
+                    <div class="value">${(results[bestRecall].recall * 100).toFixed(1)}%</div>
+                    <div class="model">${bestRecall}</div>
+                </div>
+                <div class="metric-card f1">
+                    <div class="label">⚖️ Meilleur F1-Score</div>
+                    <div class="value">${(results[bestF1].f1_score * 100).toFixed(1)}%</div>
+                    <div class="model">${bestF1}</div>
+                </div>
+                <div class="metric-card fp">
+                    <div class="label">🚫 Moins de Faux Positifs</div>
+                    <div class="value">${results[lowestFP].fp}</div>
+                    <div class="model">${lowestFP}</div>
+                </div>
+            `;
+        }
+
+        function displayRecommendations(models, results) {
+            const container = document.getElementById('recommendations');
+
+            // Best precision (minimize FP)
+            const bestPrecision = models.reduce((a, b) => results[a].precision > results[b].precision ? a : b);
+
+            // Lowest FP with decent recall (>10%)
+            const decentModels = models.filter(m => results[m].recall > 0.1);
+            const lowestFPDecent = decentModels.length > 0
+                ? decentModels.reduce((a, b) => results[a].fp < results[b].fp ? a : b)
+                : models.reduce((a, b) => results[a].fp < results[b].fp ? a : b);
+
+            // Best F1 (balanced)
+            const bestF1 = models.reduce((a, b) => results[a].f1_score > results[b].f1_score ? a : b);
+
+            // Best real-time with good precision
+            const realtimeModels = models.filter(m => results[m].avg_time_ms < 33);
+            const bestRealtimePrecision = realtimeModels.length > 0
+                ? realtimeModels.reduce((a, b) => results[a].precision > results[b].precision ? a : b)
+                : null;
+
+            const recommendations = [
+                {
+                    title: '🎯 Minimum Faux Positifs',
+                    cls: 'precision',
+                    model: bestPrecision,
+                    desc: 'Ideal quand les fausses alertes sont couteuses',
+                    stats: [
+                        `Precision: ${(results[bestPrecision].precision * 100).toFixed(1)}%`,
+                        `FP: ${results[bestPrecision].fp}`,
+                        `Recall: ${(results[bestPrecision].recall * 100).toFixed(1)}%`
+                    ]
+                },
+                {
+                    title: '⚖️ Meilleur Equilibre (F1)',
+                    cls: 'balanced',
+                    model: bestF1,
+                    desc: 'Compromis optimal precision/recall',
+                    stats: [
+                        `F1: ${(results[bestF1].f1_score * 100).toFixed(1)}%`,
+                        `Precision: ${(results[bestF1].precision * 100).toFixed(1)}%`,
+                        `Recall: ${(results[bestF1].recall * 100).toFixed(1)}%`
+                    ]
+                },
+                {
+                    title: '🚫 Peu de FP + Bon Recall',
+                    cls: 'low-fp',
+                    model: lowestFPDecent,
+                    desc: 'Fiable avec detection correcte',
+                    stats: [
+                        `FP: ${results[lowestFPDecent].fp}`,
+                        `Precision: ${(results[lowestFPDecent].precision * 100).toFixed(1)}%`,
+                        `Recall: ${(results[lowestFPDecent].recall * 100).toFixed(1)}%`
+                    ]
+                }
+            ];
+
+            if (bestRealtimePrecision) {
+                recommendations.push({
+                    title: '⚡ Temps Reel + Precision',
+                    cls: 'speed',
+                    model: bestRealtimePrecision,
+                    desc: `${(1000/results[bestRealtimePrecision].avg_time_ms).toFixed(0)} FPS`,
+                    stats: [
+                        `Precision: ${(results[bestRealtimePrecision].precision * 100).toFixed(1)}%`,
+                        `${results[bestRealtimePrecision].avg_time_ms.toFixed(1)}ms`,
+                        `FP: ${results[bestRealtimePrecision].fp}`
+                    ]
+                });
+            }
+
+            container.innerHTML = recommendations.map(r => `
+                <div class="recommendation-card ${r.cls}">
+                    <h3>${r.title}</h3>
+                    <div class="model-name">${r.model}</div>
+                    <p>${r.desc}</p>
+                    <div class="stats">
+                        ${r.stats.map(s => `<span class="stat">${s}</span>`).join('')}
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function switchRanking(mode) {
+            currentRankingMode = mode;
+            document.querySelectorAll('.tabs .tab').forEach(t => t.classList.remove('active'));
+            event.target.classList.add('active');
+            displayRanking(Object.keys(benchmarkData.results), benchmarkData.results, mode);
+        }
+
+        function displayRanking(models, results, mode) {
+            const container = document.getElementById('ranking');
+            const medals = ['🥇', '🥈', '🥉'];
+            const classes = ['gold', 'silver', 'bronze'];
+
+            let sorted;
+            let valueFormatter;
+            let labelSuffix;
+
+            switch (mode) {
+                case 'precision':
+                    sorted = [...models].sort((a, b) => results[b].precision - results[a].precision);
+                    valueFormatter = m => (results[m].precision * 100).toFixed(1) + '%';
+                    labelSuffix = m => `FP: ${results[m].fp} | Recall: ${(results[m].recall * 100).toFixed(1)}%`;
+                    break;
+                case 'recall':
+                    sorted = [...models].sort((a, b) => results[b].recall - results[a].recall);
+                    valueFormatter = m => (results[m].recall * 100).toFixed(1) + '%';
+                    labelSuffix = m => `TP: ${results[m].tp} | Precision: ${(results[m].precision * 100).toFixed(1)}%`;
+                    break;
+                case 'f1':
+                    sorted = [...models].sort((a, b) => results[b].f1_score - results[a].f1_score);
+                    valueFormatter = m => (results[m].f1_score * 100).toFixed(1) + '%';
+                    labelSuffix = m => `P: ${(results[m].precision * 100).toFixed(0)}% | R: ${(results[m].recall * 100).toFixed(0)}%`;
+                    break;
+                case 'fp':
+                    sorted = [...models].sort((a, b) => results[a].fp - results[b].fp);
+                    valueFormatter = m => results[m].fp + ' FP';
+                    labelSuffix = m => `Precision: ${(results[m].precision * 100).toFixed(1)}%`;
+                    break;
+            }
+
+            container.innerHTML = sorted.slice(0, 5).map((name, i) => {
+                const medal = medals[i] || `#${i + 1}`;
+                const cls = classes[i] || '';
+                return `
+                    <div class="ranking-card ${cls}">
+                        <div class="medal">${medal}</div>
+                        <div class="ranking-info">
+                            <h3>${name}</h3>
+                            <p>${labelSuffix(name)}</p>
+                        </div>
+                        <div class="ranking-score">${valueFormatter(name)}</div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function displayTable(models, results) {
+            const tbody = document.getElementById('table-body');
+            const sorted = [...models].sort((a, b) => results[b].precision - results[a].precision);
+
+            // Calculate FP thresholds for coloring
+            const fpValues = models.map(m => results[m].fp);
+            const fpMin = Math.min(...fpValues);
+            const fpMax = Math.max(...fpValues);
+            const fpRange = fpMax - fpMin;
+
+            tbody.innerHTML = sorted.map(name => {
+                const m = results[name];
+                const fps = m.avg_time_ms > 0 ? (1000 / m.avg_time_ms).toFixed(0) : '-';
+                const isRealtime = m.avg_time_ms < 33;
+
+                // FP coloring
+                let fpClass = 'fp-medium';
+                if (fpRange > 0) {
+                    const fpRatio = (m.fp - fpMin) / fpRange;
+                    if (fpRatio < 0.33) fpClass = 'fp-low';
+                    else if (fpRatio > 0.66) fpClass = 'fp-high';
+                }
+
+                return `
+                    <tr>
+                        <td><strong>${name}</strong></td>
+                        <td class="${getPrecisionClass(m.precision)}">${(m.precision * 100).toFixed(1)}%</td>
+                        <td class="${getRecallClass(m.recall)}">${(m.recall * 100).toFixed(1)}%</td>
+                        <td>${(m.f1_score * 100).toFixed(1)}%</td>
+                        <td>${(m.ap * 100).toFixed(1)}%</td>
+                        <td>${m.tp}</td>
+                        <td><span class="fp-badge ${fpClass}">${m.fp}</span></td>
+                        <td>${m.fn}</td>
+                        <td>${m.avg_time_ms.toFixed(1)}</td>
+                        <td>${fps}</td>
+                        <td>
+                            <span class="speed-indicator ${isRealtime ? 'speed-realtime' : 'speed-slow'}">
+                                ${isRealtime ? '✓ Oui' : '✗ Non'}
+                            </span>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+
+            // Sortable headers
+            document.querySelectorAll('#comparison-table th[data-sort]').forEach(th => {
+                th.addEventListener('click', () => sortTable(th.dataset.sort));
+            });
+        }
+
+        function getPrecisionClass(value) {
+            if (value >= 0.9) return 'value-good';
+            if (value >= 0.7) return 'value-medium';
+            return 'value-bad';
+        }
+
+        function getRecallClass(value) {
+            if (value >= 0.5) return 'value-good';
+            if (value >= 0.2) return 'value-medium';
+            return 'value-bad';
+        }
+
+        let currentSort = { key: 'precision', desc: true };
+
+        function sortTable(key) {
+            const results = benchmarkData.results;
+            let models = Object.keys(results);
+
+            if (currentSort.key === key) {
+                currentSort.desc = !currentSort.desc;
+            } else {
+                currentSort = { key, desc: key !== 'fp' && key !== 'fn' && key !== 'time' };
+            }
+
+            models.sort((a, b) => {
+                let va, vb;
+                switch (key) {
+                    case 'name': va = a; vb = b; break;
+                    case 'precision': va = results[a].precision; vb = results[b].precision; break;
+                    case 'recall': va = results[a].recall; vb = results[b].recall; break;
+                    case 'f1': va = results[a].f1_score; vb = results[b].f1_score; break;
+                    case 'ap': va = results[a].ap; vb = results[b].ap; break;
+                    case 'tp': va = results[a].tp; vb = results[b].tp; break;
+                    case 'fp': va = results[a].fp; vb = results[b].fp; break;
+                    case 'fn': va = results[a].fn; vb = results[b].fn; break;
+                    case 'time': va = results[a].avg_time_ms; vb = results[b].avg_time_ms; break;
+                    case 'fps': va = 1000/results[a].avg_time_ms; vb = 1000/results[b].avg_time_ms; break;
+                }
+                if (typeof va === 'string') {
+                    return currentSort.desc ? vb.localeCompare(va) : va.localeCompare(vb);
+                }
+                return currentSort.desc ? vb - va : va - vb;
+            });
+
+            document.querySelectorAll('#comparison-table th').forEach(th => {
+                th.classList.remove('sorted-asc', 'sorted-desc');
+                if (th.dataset.sort === key) {
+                    th.classList.add(currentSort.desc ? 'sorted-desc' : 'sorted-asc');
+                }
+            });
+
+            displayTable(models, results);
+        }
+
+        function displayCharts(models, results) {
+            const sortedByPrecision = [...models].sort((a, b) => results[b].precision - results[a].precision);
+
+            const colors = {
+                precision: 'rgba(34, 197, 94, 0.8)',
+                recall: 'rgba(59, 130, 246, 0.8)',
+                f1: 'rgba(139, 92, 246, 0.8)',
+                fp: 'rgba(239, 68, 68, 0.8)',
+                tp: 'rgba(34, 197, 94, 0.8)',
+                fn: 'rgba(249, 115, 22, 0.8)'
+            };
+
+            // Metrics Chart (Precision, Recall, F1)
+            charts.metrics = new Chart(document.getElementById('metrics-chart'), {
+                type: 'bar',
+                data: {
+                    labels: sortedByPrecision,
+                    datasets: [
+                        {
+                            label: 'Precision',
+                            data: sortedByPrecision.map(m => results[m].precision * 100),
+                            backgroundColor: colors.precision
+                        },
+                        {
+                            label: 'Recall',
+                            data: sortedByPrecision.map(m => results[m].recall * 100),
+                            backgroundColor: colors.recall
+                        },
+                        {
+                            label: 'F1-Score',
+                            data: sortedByPrecision.map(m => results[m].f1_score * 100),
+                            backgroundColor: colors.f1
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { labels: { color: '#f1f5f9' } } },
+                    scales: {
+                        x: { ticks: { color: '#94a3b8' }, grid: { color: '#334155' } },
+                        y: { ticks: { color: '#94a3b8' }, grid: { color: '#334155' }, max: 100, title: { display: true, text: '%', color: '#94a3b8' } }
+                    }
+                }
+            });
+
+            // FP Chart
+            const sortedByFP = [...models].sort((a, b) => results[a].fp - results[b].fp);
+            charts.fp = new Chart(document.getElementById('fp-chart'), {
+                type: 'bar',
+                data: {
+                    labels: sortedByFP,
+                    datasets: [{
+                        label: 'Faux Positifs (FP)',
+                        data: sortedByFP.map(m => results[m].fp),
+                        backgroundColor: sortedByFP.map((m, i) => {
+                            const ratio = i / sortedByFP.length;
+                            if (ratio < 0.33) return 'rgba(34, 197, 94, 0.8)';
+                            if (ratio < 0.66) return 'rgba(249, 115, 22, 0.8)';
+                            return 'rgba(239, 68, 68, 0.8)';
+                        })
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    indexAxis: 'y',
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { ticks: { color: '#94a3b8' }, grid: { color: '#334155' }, title: { display: true, text: 'Nombre de FP', color: '#94a3b8' } },
+                        y: { ticks: { color: '#94a3b8' }, grid: { color: '#334155' } }
+                    }
+                }
+            });
+
+            // Tradeoff Chart (Precision vs Speed)
+            charts.tradeoff = new Chart(document.getElementById('tradeoff-chart'), {
+                type: 'scatter',
+                data: {
+                    datasets: [{
+                        label: 'Modeles',
+                        data: models.map(m => ({
+                            x: results[m].avg_time_ms,
+                            y: results[m].precision * 100,
+                            label: m,
+                            fp: results[m].fp
+                        })),
+                        backgroundColor: models.map(m => {
+                            if (results[m].precision >= 0.9) return 'rgba(34, 197, 94, 0.8)';
+                            if (results[m].precision >= 0.7) return 'rgba(249, 115, 22, 0.8)';
+                            return 'rgba(239, 68, 68, 0.8)';
+                        }),
+                        pointRadius: 12
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                label: (ctx) => `${ctx.raw.label}: ${ctx.raw.y.toFixed(1)}% Precision, ${ctx.raw.x.toFixed(1)}ms, ${ctx.raw.fp} FP`
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            title: { display: true, text: 'Temps (ms) - log', color: '#94a3b8' },
+                            ticks: { color: '#94a3b8' },
+                            grid: { color: '#334155' },
+                            type: 'logarithmic'
+                        },
+                        y: {
+                            title: { display: true, text: 'Precision (%)', color: '#94a3b8' },
+                            ticks: { color: '#94a3b8' },
+                            grid: { color: '#334155' },
+                            min: 0,
+                            max: 100
+                        }
+                    }
+                }
+            });
+
+            // Confusion Chart (TP, FP, FN)
+            charts.confusion = new Chart(document.getElementById('confusion-chart'), {
+                type: 'bar',
+                data: {
+                    labels: sortedByPrecision,
+                    datasets: [
+                        {
+                            label: 'TP (Vrais Positifs)',
+                            data: sortedByPrecision.map(m => results[m].tp),
+                            backgroundColor: colors.tp
+                        },
+                        {
+                            label: 'FP (Faux Positifs)',
+                            data: sortedByPrecision.map(m => results[m].fp),
+                            backgroundColor: colors.fp
+                        },
+                        {
+                            label: 'FN (Faux Negatifs)',
+                            data: sortedByPrecision.map(m => results[m].fn),
+                            backgroundColor: colors.fn
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { labels: { color: '#f1f5f9' } } },
+                    scales: {
+                        x: { stacked: false, ticks: { color: '#94a3b8' }, grid: { color: '#334155' } },
+                        y: { stacked: false, ticks: { color: '#94a3b8' }, grid: { color: '#334155' }, type: 'logarithmic' }
+                    }
+                }
+            });
+        }
+
+        function displayDifficulty(models, results) {
+            ['easy', 'medium', 'hard'].forEach(diff => {
+                const container = document.getElementById(`difficulty-${diff}`);
+
+                const items = models.map(name => {
+                    const d = results[name].by_difficulty?.[diff];
+                    if (!d) return { name, recall: 0, precision: 0 };
+                    const recall = (d.tp + d.fn) > 0 ? d.tp / (d.tp + d.fn) : 0;
+                    const precision = (d.tp + d.fp) > 0 ? d.tp / (d.tp + d.fp) : 0;
+                    return { name, recall, precision, fp: d.fp };
+                }).sort((a, b) => b.recall - a.recall);
+
+                container.innerHTML = items.map(item => `
+                    <div class="difficulty-item">
+                        <span>${item.name}</span>
+                        <span>R: ${(item.recall * 100).toFixed(1)}% | P: ${(item.precision * 100).toFixed(0)}%</span>
+                    </div>
+                `).join('');
+            });
+        }
+
+        function exportCSV() {
+            if (!benchmarkData) return;
+
+            const results = benchmarkData.results;
+            const models = Object.keys(results);
+
+            let csv = 'Modele,Precision,Recall,F1-Score,AP,TP,FP,FN,Temps (ms),FPS,Temps Reel\n';
+
+            models.forEach(name => {
+                const m = results[name];
+                const fps = m.avg_time_ms > 0 ? (1000 / m.avg_time_ms).toFixed(0) : '-';
+                const isRealtime = m.avg_time_ms < 33 ? 'Oui' : 'Non';
+
+                csv += `${name},${(m.precision*100).toFixed(1)}%,${(m.recall*100).toFixed(1)}%,${(m.f1_score*100).toFixed(1)}%,${(m.ap*100).toFixed(1)}%,${m.tp},${m.fp},${m.fn},${m.avg_time_ms.toFixed(1)},${fps},${isRealtime}\n`;
+            });
+
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'benchmark_results.csv';
+            a.click();
+        }
+    </script>
+</body>
+</html>
