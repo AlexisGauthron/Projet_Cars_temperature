@@ -3,12 +3,13 @@
 # RunPod Benchmark Script - Face Detection
 # =============================================================================
 # Lance les benchmarks de détection de visage en mode strict pour des
-# résultats fiables et reproductibles.
+# résultats fiables et reproductibles sur TOUS les datasets.
 #
 # Usage:
-#   ./runpod_benchmark.sh                    # Benchmark par défaut
+#   ./runpod_benchmark.sh                    # Benchmark strict sur tous les datasets
 #   ./runpod_benchmark.sh --quick            # Test rapide (50 images)
 #   ./runpod_benchmark.sh --full             # Benchmark complet
+#   ./runpod_benchmark.sh --dataset wider_face  # Un seul dataset
 #   ./runpod_benchmark.sh --models YuNet SCRFD  # Modèles spécifiques
 #
 # =============================================================================
@@ -26,13 +27,16 @@ NC='\033[0m'
 # -----------------------------------------------------------------------------
 # Configuration par défaut
 # -----------------------------------------------------------------------------
-DATASET="wider_face"
+DATASET="all"  # "all" = tous les datasets
 LIMIT=300
 WARMUP=10
 PASSES=3
 MODELS=""
 MODE="strict"
 FAST_MODE=false
+
+# Liste des datasets disponibles
+ALL_DATASETS="wider_face mafa sviro"
 
 # -----------------------------------------------------------------------------
 # Parsing des arguments
@@ -97,19 +101,22 @@ while [[ $# -gt 0 ]]; do
             echo "  --full, -f        Benchmark complet (toutes images, 20 warmup, 5 passes)"
             echo ""
             echo "Options:"
-            echo "  --limit, -l N     Nombre d'images à traiter"
+            echo "  --limit, -l N     Nombre d'images à traiter par dataset"
             echo "  --warmup, -w N    Nombre d'images de warmup"
             echo "  --passes, -p N    Nombre de passes par image"
-            echo "  --dataset, -d X   Dataset à utiliser (défaut: wider_face)"
+            echo "  --dataset, -d X   Dataset à utiliser (défaut: all = tous)"
             echo "  --models M1 M2    Modèles spécifiques à tester"
             echo "  --fast            Exclure les modèles lents (MTCNN, RetinaFace...)"
             echo "  --standard        Mode standard (pas strict)"
             echo ""
+            echo "Datasets disponibles: wider_face, mafa, sviro (ou 'all' pour tous)"
+            echo ""
             echo "Exemples:"
-            echo "  $0 --quick                    # Test rapide"
+            echo "  $0                            # Strict sur TOUS les datasets"
+            echo "  $0 --quick                    # Test rapide sur tous"
+            echo "  $0 --dataset wider_face       # Un seul dataset"
             echo "  $0 --full --fast              # Complet sans modèles lents"
             echo "  $0 --models YuNet SCRFD       # Seulement YuNet et SCRFD"
-            echo "  $0 --limit 500 --passes 5     # 500 images, 5 passes"
             exit 0
             ;;
         *)
@@ -130,11 +137,15 @@ echo "==========================================================================
 echo -e "${NC}"
 
 echo -e "${CYAN}Configuration:${NC}"
-echo "  Dataset:    $DATASET"
+if [ "$DATASET" = "all" ]; then
+    echo "  Datasets:   TOUS ($ALL_DATASETS)"
+else
+    echo "  Dataset:    $DATASET"
+fi
 if [ -z "$LIMIT" ]; then
     echo "  Images:     TOUTES"
 else
-    echo "  Images:     $LIMIT"
+    echo "  Images:     $LIMIT par dataset"
 fi
 echo "  Mode:       $MODE"
 if [ "$MODE" = "strict" ]; then
@@ -169,32 +180,46 @@ fi
 echo ""
 
 # -----------------------------------------------------------------------------
-# Préparation de la commande
+# Fonction pour construire la commande
 # -----------------------------------------------------------------------------
-CMD="python benchmark.py --dataset $DATASET"
+build_cmd() {
+    local ds=$1
+    local cmd="python benchmark.py --dataset $ds"
 
-# Ajouter la limite si spécifiée
-if [ -n "$LIMIT" ]; then
-    CMD="$CMD --limit $LIMIT"
+    # Ajouter la limite si spécifiée
+    if [ -n "$LIMIT" ]; then
+        cmd="$cmd --limit $LIMIT"
+    fi
+
+    # Mode strict ou standard
+    if [ "$MODE" = "strict" ]; then
+        cmd="$cmd --benchmark-strict --warmup $WARMUP --passes $PASSES"
+    fi
+
+    # Modèles spécifiques
+    if [ -n "$MODELS" ]; then
+        cmd="$cmd --models$MODELS"
+    fi
+
+    # Fast mode
+    if [ "$FAST_MODE" = true ]; then
+        cmd="$cmd --fast"
+    fi
+
+    echo "$cmd"
+}
+
+# -----------------------------------------------------------------------------
+# Affichage des commandes
+# -----------------------------------------------------------------------------
+echo -e "${CYAN}Commandes à exécuter:${NC}"
+if [ "$DATASET" = "all" ]; then
+    for ds in $ALL_DATASETS; do
+        echo "  $(build_cmd $ds)"
+    done
+else
+    echo "  $(build_cmd $DATASET)"
 fi
-
-# Mode strict ou standard
-if [ "$MODE" = "strict" ]; then
-    CMD="$CMD --benchmark-strict --warmup $WARMUP --passes $PASSES"
-fi
-
-# Modèles spécifiques
-if [ -n "$MODELS" ]; then
-    CMD="$CMD --models$MODELS"
-fi
-
-# Fast mode
-if [ "$FAST_MODE" = true ]; then
-    CMD="$CMD --fast"
-fi
-
-echo -e "${CYAN}Commande:${NC}"
-echo "  $CMD"
 echo ""
 
 # -----------------------------------------------------------------------------
@@ -213,10 +238,29 @@ echo -e "${BLUE}================================================================
 echo ""
 
 START_TIME=$(date +%s)
+BENCHMARK_EXIT_CODE=0
 
-# Exécuter le benchmark
-eval $CMD
-BENCHMARK_EXIT_CODE=$?
+# Exécuter le(s) benchmark(s)
+if [ "$DATASET" = "all" ]; then
+    TOTAL_DATASETS=$(echo $ALL_DATASETS | wc -w | tr -d ' ')
+    CURRENT=0
+
+    for ds in $ALL_DATASETS; do
+        CURRENT=$((CURRENT + 1))
+        echo ""
+        echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+        echo -e "${CYAN}   DATASET $CURRENT/$TOTAL_DATASETS: $ds${NC}"
+        echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+        echo ""
+
+        CMD=$(build_cmd $ds)
+        eval $CMD || BENCHMARK_EXIT_CODE=$?
+    done
+else
+    CMD=$(build_cmd $DATASET)
+    eval $CMD
+    BENCHMARK_EXIT_CODE=$?
+fi
 
 END_TIME=$(date +%s)
 DURATION=$((END_TIME - START_TIME))
