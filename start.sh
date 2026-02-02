@@ -37,7 +37,7 @@ echo -e "${YELLOW}Verification des dependances...${NC}"
 check_command python3 || check_command python
 check_command node
 check_command npm
-check_command uvicorn
+# uvicorn sera lance via python -m uvicorn
 
 # Fonction de nettoyage
 cleanup() {
@@ -56,7 +56,7 @@ trap cleanup SIGINT SIGTERM EXIT
 # Lancement du Backend
 echo -e "${GREEN}[1/2] Demarrage du Backend (port 8000)...${NC}"
 cd "$SCRIPT_DIR/backend"
-uvicorn app.main:app --reload --port 8000 &
+python -m uvicorn app.main:app --reload --port 8000 &
 BACKEND_PID=$!
 
 # Attendre que le backend demarre
