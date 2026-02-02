@@ -6,6 +6,8 @@ class FrameRequest(BaseModel):
     image: str  # Base64 encoded image
     temperature: float
     mode: str = "single"  # "single" ou "multi"
+    smoothing: bool = True  # True = lissé, False = émotions brutes
+    model: str = "fer"  # "fer", "hsemotion", "deepface"
 
 
 class FaceData(BaseModel):
@@ -22,12 +24,21 @@ class FacesSummary(BaseModel):
     faces: List[FaceData]
 
 
+class PPGData(BaseModel):
+    """Données de Photopléthysmographie pour le confort thermique."""
+    pulsatile_intensity: float  # Intensité Pulsatile (0-1)
+    thermal_state: str  # "cold", "cool", "neutral", "warm", "hot", "unknown"
+    confidence: float  # Confiance de la mesure (0-1)
+    buffer_fill: float  # Pourcentage de remplissage du buffer (0-1)
+
+
 class FrameResponse(BaseModel):
     emotion: str  # Global dominant emotion
     annotated_image: str  # Base64 encoded annotated image
     primary_emotion: str  # "confortable" ou "inconfortable" (global)
     temperature: float
     faces_summary: FacesSummary  # Details of all detected faces
+    ppg: Optional[PPGData] = None  # Données PPG (optionnel)
 
 
 class VLMCheckResponse(BaseModel):

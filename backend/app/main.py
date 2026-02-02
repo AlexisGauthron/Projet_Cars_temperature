@@ -2,7 +2,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.routers import frame, vlm
+from app.routers import frame, vlm, dataset
 from app.config import Settings
 
 app = FastAPI(
@@ -21,6 +21,7 @@ app.add_middleware(
 
 app.include_router(frame.router, prefix="/api")
 app.include_router(vlm.router, prefix="/api")
+app.include_router(dataset.router)
 
 
 @app.get("/")
