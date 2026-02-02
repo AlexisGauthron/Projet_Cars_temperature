@@ -280,3 +280,67 @@
     transform: translateY(0);
   }
 }
+
+/* Indicateur PPG (confort thermique physiologique) - En bas à gauche */
+.ppg-indicator {
+  position: absolute;
+  bottom: 18px;
+  left: 18px;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(8px);
+  border: 2px solid;
+  border-radius: 14px;
+  padding: 10px 14px;
+  min-width: 140px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+  z-index: 40;
+  animation: slideInLeft 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.ppg-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.ppg-icon {
+  font-size: 20px;
+  line-height: 1;
+}
+
+.ppg-label {
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+}
+
+.ppg-details {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.ppg-bar-container {
+  flex: 1;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.ppg-bar-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.3s ease-out, background-color 0.3s ease-out;
+  min-width: 2px;
+}
+
+.ppg-confidence {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.7);
+  font-weight: 500;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
