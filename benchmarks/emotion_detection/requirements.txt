@@ -1,0 +1,19 @@
+# Core dependencies
+numpy>=1.20.0
+opencv-python>=4.5.0
+tqdm>=4.60.0
+
+# Classifiers (install the ones you want to benchmark)
+deepface>=0.0.79
+hsemotion>=0.3
+fer>=22.4.0
+rmn>=1.1.0
+
+# Optional: for downloading datasets
+gdown>=4.6.0
+kaggle>=1.5.0
+requests>=2.25.0
+
+# Optional: for advanced visualizations
+matplotlib>=3.4.0
+seaborn>=0.11.0

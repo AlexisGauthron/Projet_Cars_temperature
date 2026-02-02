@@ -1,0 +1,69 @@
+{
+  "metadata": {
+    "timestamp": "2026-01-27T04:25:35.928836",
+    "dataset": "fer2013",
+    "num_classifiers": 1
+  },
+  "results": {
+    "DeepFace": {
+      "classifier": "DeepFace",
+      "total_samples": 20,
+      "accuracy": 75.0,
+      "macro_f1": 12.24,
+      "weighted_f1": 85.71,
+      "avg_time_ms": 3.56,
+      "fps": 280.8,
+      "per_class": {
+        "ANGRY": {
+          "accuracy": 0.0,
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0,
+          "support": 0
+        },
+        "DISGUST": {
+          "accuracy": 0.0,
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0,
+          "support": 0
+        },
+        "FEAR": {
+          "accuracy": 0.0,
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0,
+          "support": 0
+        },
+        "HAPPY": {
+          "accuracy": 75.0,
+          "precision": 100.0,
+          "recall": 75.0,
+          "f1": 85.71,
+          "support": 20
+        },
+        "SAD": {
+          "accuracy": 0.0,
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0,
+          "support": 0
+        },
+        "SURPRISE": {
+          "accuracy": 0.0,
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0,
+          "support": 0
+        },
+        "NEUTRAL": {
+          "accuracy": 0.0,
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0,
+          "support": 0
+        }
+      }
+    }
+  }
+}

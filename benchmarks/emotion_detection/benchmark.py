@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Benchmark de détection de visage.
+Benchmark de classification d'émotions faciales.
 
-CLI unifié avec les mêmes commandes que emotion_detection.
+CLI unifié avec les mêmes commandes que face_detection.
 
 Usage:
     # Commandes de base
@@ -13,11 +13,11 @@ Usage:
     python benchmark.py --list-profiles           # Lister les profils strict
 
     # Benchmark standard
-    python benchmark.py -d wider_face -l 300      # 300 images de WIDER FACE
-    python benchmark.py -m YuNet SCRFD -l 300     # Modèles spécifiques
+    python benchmark.py -d fer2013 -l 500         # 500 images de FER2013
+    python benchmark.py -m hsemotion deepface     # Modèles spécifiques
 
     # Options communes
-    python benchmark.py -e MTCNN RetinaFace       # Exclure des modèles
+    python benchmark.py -e rmn fer_pytorch        # Exclure des modèles
     python benchmark.py -p --workers 4            # Mode parallèle
     python benchmark.py -v                        # Mode verbeux
     python benchmark.py -f                        # Forcer recalcul
@@ -26,10 +26,6 @@ Usage:
     python benchmark.py --strict                  # Profil standard
     python benchmark.py --strict --profile publication
     python benchmark.py --strict -w 20 --passes 5 # Override manuel
-
-    # Options spécifiques face detection
-    python benchmark.py --iou 0.75                # Seuil IoU personnalisé
-    python benchmark.py --timeout 5.0             # Timeout par image
 """
 
 import argparse
@@ -40,18 +36,13 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-# Imports locaux (depuis face_detection/)
-from config import RESULTS_DIR, SLOW_DETECTORS, DEFAULT_IOU_THRESHOLD
-from config import STRICT_WARMUP_IMAGES, STRICT_NUM_PASSES
-from core import (
-    print_results,
-    get_results_filepath,
-    load_existing_results,
-    merge_and_save_results,
-)
-from datasets import get_dataset, list_datasets
-from detectors import get_all_detectors, list_detectors
-from runner import run_benchmark, run_benchmark_parallel, run_all_detectors_strict
+from config import DEFAULT_DATASET, DEFAULT_LIMIT
+from datasets import get_dataset, list_datasets, DATASET_REGISTRY
+from classifiers import get_classifier, list_classifiers, get_available_classifiers, CLASSIFIER_REGISTRY
+from runner.engine import run_benchmark, run_benchmark_sequential, run_benchmark_parallel
+from runner.strict_engine import run_all_classifiers_strict
+from core.results import save_results, print_results_table, print_per_class_comparison
+from core.metrics import print_classification_report, print_confusion_matrix
 
 # Import config partagée (depuis benchmarks/shared_config/)
 try:
@@ -59,12 +50,14 @@ try:
     HAS_SHARED_CONFIG = True
 except ImportError:
     HAS_SHARED_CONFIG = False
+    # Valeurs par défaut
+    DEFAULT_WARMUP = 10
+    DEFAULT_PASSES = 3
 
 
 def get_strict_params(args):
     """Récupère les paramètres du mode strict selon le profil ou les overrides."""
     if HAS_SHARED_CONFIG:
-        # Utiliser la config partagée
         if args.profile:
             profile = shared_strict_config.get_profile(args.profile)
             warmup = profile["warmup_images"]
@@ -73,9 +66,8 @@ def get_strict_params(args):
             warmup = shared_strict_config.WARMUP_IMAGES
             passes = shared_strict_config.NUM_PASSES
     else:
-        # Fallback sur config locale
-        warmup = STRICT_WARMUP_IMAGES
-        passes = STRICT_NUM_PASSES
+        warmup = DEFAULT_WARMUP
+        passes = DEFAULT_PASSES
 
     # Override manuel si spécifié
     if args.warmup is not None:
@@ -88,26 +80,26 @@ def get_strict_params(args):
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Benchmark de détection de visage",
+        description="Benchmark de classification d'émotions faciales",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Exemples:
-  python benchmark.py -d wider_face -l 300
-  python benchmark.py -m YuNet SCRFD -l 300
+  python benchmark.py -d fer2013 -l 500
+  python benchmark.py -m hsemotion deepface -l 500
   python benchmark.py --strict --profile publication
   python benchmark.py --list
         """
     )
 
     # =========================================================================
-    # ARGUMENTS COMMUNS (identiques à emotion_detection)
+    # ARGUMENTS COMMUNS (identiques à face_detection)
     # =========================================================================
 
     parser.add_argument(
         "--dataset", "-d",
         type=str,
-        default="wider_face",
-        help="Dataset à utiliser (défaut: wider_face)"
+        default=DEFAULT_DATASET,
+        help=f"Dataset à utiliser (défaut: {DEFAULT_DATASET})"
     )
 
     parser.add_argument(
@@ -120,8 +112,8 @@ Exemples:
     parser.add_argument(
         "--limit", "-l",
         type=int,
-        default=None,
-        help="Nombre maximum d'images à traiter"
+        default=DEFAULT_LIMIT,
+        help=f"Nombre maximum d'images à traiter (défaut: {DEFAULT_LIMIT})"
     )
 
     parser.add_argument(
@@ -160,7 +152,7 @@ Exemples:
     parser.add_argument(
         "--verbose", "-v",
         action="store_true",
-        help="Affichage détaillé"
+        help="Affichage détaillé (rapport par classe, matrice de confusion)"
     )
 
     # =========================================================================
@@ -223,24 +215,6 @@ Exemples:
         help="Lister les profils de benchmark strict"
     )
 
-    # =========================================================================
-    # SPÉCIFIQUE FACE DETECTION
-    # =========================================================================
-
-    parser.add_argument(
-        "--iou",
-        type=float,
-        default=DEFAULT_IOU_THRESHOLD,
-        help=f"Seuil IoU pour le matching (défaut: {DEFAULT_IOU_THRESHOLD})"
-    )
-
-    parser.add_argument(
-        "--timeout",
-        type=float,
-        default=None,
-        help="Timeout par image en secondes"
-    )
-
     args = parser.parse_args()
 
     # =========================================================================
@@ -252,30 +226,26 @@ Exemples:
             shared_strict_config.print_profiles()
         else:
             print("Config partagée non disponible")
+            print("Profils: quick, standard, publication")
         return 0
 
     if args.list or args.list_models:
         print("\n" + "=" * 60)
         print("MODÈLES DISPONIBLES")
         print("=" * 60)
-        detectors_info = list_detectors()
-        for name, info in detectors_info.items():
-            status = "OK" if info["is_available"] else "NOT AVAILABLE"
-            print(f"  {name:<20} [{status}]")
-        available = sum(1 for info in detectors_info.values() if info["is_available"])
-        print(f"\nTotal: {available}/{len(detectors_info)} modèles disponibles")
-
-        if not args.list_models:  # Si --list, afficher aussi les datasets
-            args.list_datasets = True
+        for name, info in list_classifiers().items():
+            status = "OK" if info.get("is_available") else "NOT AVAILABLE"
+            desc = info.get("description", "")
+            print(f"  {name:<20} [{status}] {desc}")
 
     if args.list or args.list_datasets:
         print("\n" + "=" * 60)
         print("DATASETS DISPONIBLES")
         print("=" * 60)
-        datasets_info = list_datasets()
-        for name, info in datasets_info.items():
-            status = "OK" if info["is_available"] else "NOT FOUND"
-            print(f"  {name:<20} [{status}] - {info.get('description', '')}")
+        for name, info in list_datasets().items():
+            status = "OK" if info.get("is_available") else "NOT FOUND"
+            desc = info.get("description", "")
+            print(f"  {name:<20} [{status}] {desc}")
 
     if args.list or args.list_models or args.list_datasets:
         return 0
@@ -285,82 +255,60 @@ Exemples:
     # =========================================================================
 
     print("\n" + "=" * 70)
-    print("BENCHMARK - DÉTECTION DE VISAGE")
+    print("BENCHMARK - CLASSIFICATION D'ÉMOTIONS")
     print("=" * 70)
 
     # Charger le dataset
-    dataset_name = args.dataset
+    print(f"\nDataset: {args.dataset}")
     try:
-        dataset = get_dataset(dataset_name)
-    except ValueError as e:
-        print(f"Erreur: {e}")
-        return 1
-
-    if not dataset.is_available():
-        print(f"Dataset '{dataset_name}' non disponible")
-        print("  Exécutez: python scripts/download_datasets.py")
-        return 1
-
-    print(f"\nDataset: {dataset.name}")
-    annotations = dataset.get_annotations()
-    total_faces = sum(len(boxes) for boxes in annotations.values())
-    print(f"  {len(annotations)} images, {total_faces} visages annotés")
-
-    # Déterminer le fichier de résultats
-    results_filepath = Path(args.export) if args.export else get_results_filepath(
-        dataset_name, args.limit, strict_mode=args.strict
-    )
-    print(f"\nFichier résultats: {results_filepath}")
-
-    # Charger les résultats existants
-    existing_results = load_existing_results(results_filepath)
-    if existing_results:
-        print(f"  Résultats existants: {list(existing_results.keys())}")
-
-    # Charger les détecteurs
-    all_detectors = get_all_detectors()
-    print(f"\nModèles disponibles: {len(all_detectors)}")
-
-    if args.verbose:
-        for d in all_detectors:
-            print(f"  - {d.name}")
-
-    # Filtrer par modèles demandés
-    if args.models:
-        requested = [m.lower() for m in args.models]
-        detectors = [d for d in all_detectors if d.name.lower() in requested]
-        if not detectors:
-            print(f"Erreur: Aucun modèle trouvé parmi: {args.models}")
+        dataset = get_dataset(args.dataset)
+        if not dataset.is_available():
+            print(f"  Dataset '{args.dataset}' non disponible!")
+            print(f"  Exécutez: python scripts/download_datasets.py {args.dataset}")
             return 1
+        stats = dataset.get_stats()
+        print(f"  Échantillons: {stats['total_samples']}")
+        print(f"  Classes: {stats['num_classes']}")
+    except Exception as e:
+        print(f"  Erreur: {e}")
+        return 1
+
+    # Charger les classifieurs
+    if args.models:
+        classifier_names = args.models
     else:
-        detectors = all_detectors
+        # Tous les classifieurs disponibles
+        classifier_names = [name for name, info in list_classifiers().items()
+                           if info.get("is_available")]
 
     # Exclure des modèles
     if args.exclude:
         exclude_lower = [e.lower() for e in args.exclude]
-        before = len(detectors)
-        detectors = [d for d in detectors if d.name.lower() not in exclude_lower]
-        print(f"  Exclusion: {args.exclude} ({before} -> {len(detectors)} modèles)")
+        before = len(classifier_names)
+        classifier_names = [n for n in classifier_names if n.lower() not in exclude_lower]
+        print(f"\n  Exclusion: {args.exclude} ({before} -> {len(classifier_names)} modèles)")
 
-    # Filtrer les modèles déjà calculés (sauf si --force)
-    if existing_results and not args.force:
-        already_done = [d.name for d in detectors if d.name in existing_results]
-        detectors = [d for d in detectors if d.name not in existing_results]
-        if already_done:
-            print(f"  Déjà calculés (skip): {already_done}")
-        if not detectors:
-            print("\nTous les modèles demandés ont déjà des résultats!")
-            print("  Utilisez --force pour recalculer.")
-            return 0
+    classifiers = []
+    print(f"\nModèles:")
+    for name in classifier_names:
+        try:
+            classifier = get_classifier(name)
+            if classifier.is_available():
+                classifiers.append(classifier)
+                print(f"  - {name}: OK")
+            else:
+                print(f"  - {name}: Non disponible")
+        except Exception as e:
+            print(f"  - {name}: Erreur - {e}")
 
-    print(f"\nModèles à tester: {[d.name for d in detectors]}")
+    if not classifiers:
+        print("\nAucun classifieur disponible!")
+        print("  pip install deepface hsemotion fer rmn")
+        return 1
 
     # Configuration
     print(f"\nConfiguration:")
     print(f"  Limite: {args.limit or 'toutes'} images")
-    print(f"  IoU: {args.iou}")
-    if args.timeout:
-        print(f"  Timeout: {args.timeout}s")
 
     # Exécuter le benchmark
     results = {}
@@ -372,11 +320,10 @@ Exemples:
         print(f"  Mode: STRICT (profil: {profile_name})")
         print(f"  Warmup: {warmup} images, Passes: {passes}")
 
-        results = run_all_detectors_strict(
-            detectors=detectors,
+        results = run_all_classifiers_strict(
+            classifiers=classifiers,
             dataset=dataset,
             limit=args.limit,
-            iou_threshold=args.iou,
             warmup_images=warmup,
             num_passes=passes
         )
@@ -387,11 +334,9 @@ Exemples:
         print(f"  Note: Les temps ne sont pas objectifs en mode parallèle!")
 
         results = run_benchmark_parallel(
-            detectors=detectors,
-            dataset=dataset,
+            classifiers, dataset,
             limit=args.limit,
-            iou_threshold=args.iou,
-            timeout=args.timeout,
+            warmup=args.warmup or 5,
             num_workers=args.workers
         )
 
@@ -399,30 +344,26 @@ Exemples:
         # Mode séquentiel (défaut)
         print(f"  Mode: SÉQUENTIEL")
 
-        import time
-        start_time = time.time()
-
-        for detector in detectors:
-            print(f"\n  Testing {detector.name}...")
-            metrics = run_benchmark(
-                detector=detector,
-                dataset=dataset,
-                limit=args.limit,
-                iou_threshold=args.iou,
-                timeout_per_image=args.timeout
-            )
-            results[detector.name] = metrics
-
-        elapsed = time.time() - start_time
-        print(f"\n  Temps total: {elapsed:.1f}s")
+        results = run_benchmark_sequential(
+            classifiers, dataset,
+            limit=args.limit,
+            warmup=args.warmup or 5
+        )
 
     # Afficher les résultats
-    if results:
-        print_results(results, verbose=args.verbose)
+    print_results_table(results)
 
-    # Sauvegarder
-    RESULTS_DIR.mkdir(exist_ok=True)
-    merge_and_save_results(results, existing_results, results_filepath, dataset_name, args.limit)
+    if args.verbose:
+        print_per_class_comparison(results)
+
+        for name, metrics in results.items():
+            print_classification_report(metrics)
+            print("\nMatrice de confusion:")
+            print_confusion_matrix(metrics)
+
+    # Sauvegarder les résultats
+    output_dir = Path(args.export).parent if args.export else None
+    save_results(results, args.dataset, output_dir)
 
     print("\nBenchmark terminé!")
     return 0

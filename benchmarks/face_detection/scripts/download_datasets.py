@@ -18,7 +18,7 @@ import ssl
 ssl._create_default_https_context = ssl._create_unverified_context
 
 # Chemins
-DATASETS_DIR = Path(__file__).parent.parent / "datasets"
+DATASETS_DIR = Path(__file__).parent.parent / "datasets" / "data"
 ANNOTATIONS_DIR = Path(__file__).parent.parent / "annotations"
 
 # URLs

@@ -1,0 +1,844 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Face Detection - Web Tester</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #1a1a2e;
+            color: #eee;
+            min-height: 100vh;
+        }
+
+        .header {
+            background: #16213e;
+            padding: 1rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 2px solid #0f3460;
+        }
+
+        .header h1 {
+            font-size: 1.5rem;
+            color: #e94560;
+        }
+
+        .header .status {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .status-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #4ade80;
+            animation: pulse 2s infinite;
+        }
+
+        .status-dot.error {
+            background: #ef4444;
+        }
+
+        .status-dot.processing {
+            background: #fbbf24;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .container {
+            display: grid;
+            grid-template-columns: 1fr 350px;
+            gap: 1rem;
+            padding: 1rem;
+            max-width: 1600px;
+            margin: 0 auto;
+        }
+
+        .video-section {
+            background: #16213e;
+            border-radius: 12px;
+            overflow: hidden;
+        }
+
+        .video-container {
+            position: relative;
+            aspect-ratio: 4/3;
+            background: #000;
+        }
+
+        #video {
+            width: 100%;
+            height: 100%;
+            object-fit: fill;
+        }
+
+        #overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            object-fit: fill;
+        }
+
+        #captureCanvas {
+            display: none;
+        }
+
+        .legend {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background: rgba(0, 0, 0, 0.75);
+            padding: 10px;
+            border-radius: 8px;
+            font-family: monospace;
+            font-size: 13px;
+            max-width: 300px;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin: 4px 0;
+        }
+
+        .legend-color {
+            width: 14px;
+            height: 14px;
+            border-radius: 3px;
+            flex-shrink: 0;
+        }
+
+        .legend-text {
+            flex: 1;
+        }
+
+        .legend-stats {
+            color: #888;
+        }
+
+        .mode-toggle {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .mode-btn {
+            flex: 1;
+            padding: 0.75rem;
+            border: none;
+            border-radius: 8px;
+            background: #0f3460;
+            color: #ccc;
+            cursor: pointer;
+            font-size: 0.9rem;
+            transition: all 0.2s;
+        }
+
+        .mode-btn:hover {
+            background: #1a4a7a;
+        }
+
+        .mode-btn.active {
+            background: #e94560;
+            color: #fff;
+        }
+
+        .sidebar {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+            max-height: calc(100vh - 100px);
+            overflow-y: auto;
+        }
+
+        .panel {
+            background: #16213e;
+            border-radius: 12px;
+            padding: 1rem;
+        }
+
+        .panel h2 {
+            font-size: 1rem;
+            color: #e94560;
+            margin-bottom: 1rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 1px solid #0f3460;
+        }
+
+        .detector-category {
+            margin-bottom: 1rem;
+        }
+
+        .detector-category h3 {
+            font-size: 0.75rem;
+            color: #888;
+            text-transform: uppercase;
+            margin-bottom: 0.5rem;
+        }
+
+        .detector-grid {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+        }
+
+        .detector-btn {
+            padding: 0.4rem 0.75rem;
+            border: 2px solid transparent;
+            border-radius: 6px;
+            background: #0f3460;
+            color: #ccc;
+            cursor: pointer;
+            font-size: 0.8rem;
+            transition: all 0.2s;
+            position: relative;
+        }
+
+        .detector-btn:hover {
+            background: #1a4a7a;
+            color: #fff;
+        }
+
+        .detector-btn.active {
+            color: #fff;
+            border-color: currentColor;
+        }
+
+        .detector-btn.unavailable {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+
+        .detector-btn .color-dot {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-right: 4px;
+            vertical-align: middle;
+        }
+
+        .controls {
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+        }
+
+        .control-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .control-row label {
+            font-size: 0.9rem;
+            color: #aaa;
+        }
+
+        .toggle {
+            position: relative;
+            width: 50px;
+            height: 26px;
+        }
+
+        .toggle input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .toggle-slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: #0f3460;
+            border-radius: 26px;
+            transition: 0.3s;
+        }
+
+        .toggle-slider:before {
+            position: absolute;
+            content: "";
+            height: 20px;
+            width: 20px;
+            left: 3px;
+            bottom: 3px;
+            background: #fff;
+            border-radius: 50%;
+            transition: 0.3s;
+        }
+
+        .toggle input:checked + .toggle-slider {
+            background: #e94560;
+        }
+
+        .toggle input:checked + .toggle-slider:before {
+            transform: translateX(24px);
+        }
+
+        .results-panel {
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .result-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.5rem;
+            border-bottom: 1px solid #0f3460;
+            font-size: 0.85rem;
+        }
+
+        .result-item:last-child {
+            border-bottom: none;
+        }
+
+        .result-item .name {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .result-item .color-indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 3px;
+        }
+
+        .result-item .stats {
+            display: flex;
+            gap: 1rem;
+            font-family: monospace;
+        }
+
+        .result-item .faces {
+            color: #4ade80;
+        }
+
+        .result-item .time {
+            color: #fbbf24;
+        }
+
+        .btn-clear {
+            width: 100%;
+            padding: 0.5rem;
+            border: none;
+            border-radius: 6px;
+            background: #7f1d1d;
+            color: #fecaca;
+            cursor: pointer;
+            font-size: 0.85rem;
+            margin-top: 0.5rem;
+        }
+
+        .btn-clear:hover {
+            background: #991b1b;
+        }
+
+        .info-box {
+            background: #0f3460;
+            padding: 0.75rem;
+            border-radius: 8px;
+            font-size: 0.85rem;
+            color: #aaa;
+            margin-bottom: 1rem;
+        }
+
+        .info-box strong {
+            color: #e94560;
+        }
+
+        @media (max-width: 1024px) {
+            .container {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Face Detection - Web Tester</h1>
+        <div class="status">
+            <span id="status-text">Chargement...</span>
+            <div class="status-dot" id="status-dot"></div>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="video-section">
+            <div class="video-container">
+                <video id="video" autoplay playsinline muted></video>
+                <canvas id="overlay"></canvas>
+                <canvas id="captureCanvas"></canvas>
+
+                <div class="legend" id="legend" style="display: none;"></div>
+            </div>
+        </div>
+
+        <div class="sidebar">
+            <div class="panel">
+                <h2>Mode</h2>
+                <div class="mode-toggle">
+                    <button class="mode-btn active" id="mode-multi" onclick="setMode('multi')">
+                        Multi-Modeles
+                    </button>
+                    <button class="mode-btn" id="mode-single" onclick="setMode('single')">
+                        Un seul
+                    </button>
+                </div>
+                <div class="info-box">
+                    <strong>Multi:</strong> Cliquez sur plusieurs detecteurs pour comparer.<br>
+                    <strong>Single:</strong> Un seul detecteur a la fois.
+                </div>
+            </div>
+
+            <div class="panel">
+                <h2>Detecteurs</h2>
+                <div id="detectors-list">
+                    <p>Chargement...</p>
+                </div>
+            </div>
+
+            <div class="panel">
+                <h2>Controles</h2>
+                <div class="controls">
+                    <div class="control-row">
+                        <label>Detection active</label>
+                        <label class="toggle">
+                            <input type="checkbox" id="detection-toggle" checked>
+                            <span class="toggle-slider"></span>
+                        </label>
+                    </div>
+                    <div class="control-row">
+                        <label>Interval: <span id="interval-value">100</span>ms</label>
+                        <input type="range" id="interval-slider" min="33" max="500" value="100" style="width: 120px;">
+                    </div>
+                </div>
+            </div>
+
+            <div class="panel">
+                <h2>Resultats</h2>
+                <div class="results-panel" id="results-list">
+                    <p style="color: #666; text-align: center;">Selectionnez des detecteurs</p>
+                </div>
+                <button class="btn-clear" onclick="clearSelection()">Effacer la selection</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // State
+        let mode = 'multi';
+        let selectedDetectors = ['YuNet'];
+        let detectionEnabled = true;
+        let detectionInterval = 100;
+        let detectorsData = {};
+        let isDetecting = false; // Prevent overlapping requests
+        let lastResults = {}; // Store last detection results for smooth overlay
+
+        // Couleurs prédéfinies pour les détecteurs
+        const DETECTOR_COLORS = {
+            "YuNet": "#00ff00",
+            "Haar": "#ffff00",
+            "MediaPipe": "#00ffff",
+            "FaceBoxes": "#ff00ff",
+            "CenterFace": "#80ff80",
+            "OpenCV-DNN": "#ffa500",
+            "DLib-HOG": "#ff0080",
+            "DLib-CNN": "#8000ff",
+            "YOLO5Face": "#ff8000",
+            "YOLOv8-face": "#0080ff",
+            "YOLOv9-face": "#4040ff",
+            "YOLOv10-face": "#40ff40",
+            "YOLOv11-face": "#ff4040",
+            "YOLOv11-face-AdamCodd": "#ff8080",
+            "YOLOv12-face": "#8080ff",
+            "YOLO26": "#ffff80",
+            "SCRFD": "#ff0000",
+            "SCRFD_500M": "#ff2020",
+            "SCRFD_2.5G": "#ff4040",
+            "SCRFD_10G": "#ff6060",
+            "SCRFD_34G": "#ff8080",
+            "RetinaFace": "#0000ff",
+            "MTCNN": "#0080ff",
+            "DSFD": "#808000",
+            "TinaFace": "#800080",
+        };
+
+        function getDetectorColor(name) {
+            if (DETECTOR_COLORS[name]) return DETECTOR_COLORS[name];
+            let hash = 0;
+            for (let i = 0; i < name.length; i++) {
+                hash = name.charCodeAt(i) + ((hash << 5) - hash);
+            }
+            return `hsl(${hash % 360}, 70%, 50%)`;
+        }
+
+        // Elements
+        const video = document.getElementById('video');
+        const overlay = document.getElementById('overlay');
+        const overlayCtx = overlay.getContext('2d');
+        const captureCanvas = document.getElementById('captureCanvas');
+        const captureCtx = captureCanvas.getContext('2d');
+        const statusText = document.getElementById('status-text');
+        const statusDot = document.getElementById('status-dot');
+        const detectorsListEl = document.getElementById('detectors-list');
+        const resultsListEl = document.getElementById('results-list');
+        const legendEl = document.getElementById('legend');
+
+        // Categorize detectors
+        const CATEGORIES = {
+            'Legers': ['YuNet', 'Haar', 'MediaPipe', 'FaceBoxes', 'CenterFace'],
+            'Equilibres': ['OpenCV-DNN', 'DLib-HOG'],
+            'YOLO': ['YOLO5Face', 'YOLOv8-face', 'YOLOv9-face', 'YOLOv10-face', 'YOLOv11-face', 'YOLOv11-face-AdamCodd', 'YOLOv12-face', 'YOLO26'],
+            'Haute Precision': ['SCRFD', 'SCRFD_500M', 'SCRFD_2.5G', 'SCRFD_10G', 'SCRFD_34G', 'RetinaFace', 'MTCNN', 'DLib-CNN', 'DSFD', 'TinaFace']
+        };
+
+        function setMode(newMode) {
+            mode = newMode;
+            document.getElementById('mode-multi').classList.toggle('active', mode === 'multi');
+            document.getElementById('mode-single').classList.toggle('active', mode === 'single');
+
+            if (mode === 'single' && selectedDetectors.length > 1) {
+                selectedDetectors = [selectedDetectors[0]];
+                updateDetectorButtons();
+            }
+        }
+
+        async function initWebcam() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    video: { width: 640, height: 480, facingMode: 'user' }
+                });
+                video.srcObject = stream;
+
+                return new Promise((resolve) => {
+                    video.onloadedmetadata = () => {
+                        video.play();
+
+                        // Set canvas sizes to match video
+                        overlay.width = video.videoWidth;
+                        overlay.height = video.videoHeight;
+                        captureCanvas.width = video.videoWidth;
+                        captureCanvas.height = video.videoHeight;
+
+                        statusText.textContent = 'Camera active';
+                        statusDot.classList.remove('error');
+
+                        resolve(true);
+                    };
+                });
+            } catch (err) {
+                console.error('Webcam error:', err);
+                statusText.textContent = 'Erreur camera';
+                statusDot.classList.add('error');
+                return false;
+            }
+        }
+
+        async function loadDetectors() {
+            try {
+                const response = await fetch('/api/detectors');
+                detectorsData = await response.json();
+
+                detectorsListEl.innerHTML = '';
+
+                for (const [category, names] of Object.entries(CATEGORIES)) {
+                    const categoryDiv = document.createElement('div');
+                    categoryDiv.className = 'detector-category';
+
+                    const categoryTitle = document.createElement('h3');
+                    categoryTitle.textContent = category;
+                    categoryDiv.appendChild(categoryTitle);
+
+                    const gridDiv = document.createElement('div');
+                    gridDiv.className = 'detector-grid';
+
+                    for (const name of names) {
+                        if (detectorsData[name]) {
+                            const btn = document.createElement('button');
+                            btn.className = 'detector-btn';
+                            btn.dataset.detector = name;
+
+                            const color = getDetectorColor(name);
+                            const colorDot = document.createElement('span');
+                            colorDot.className = 'color-dot';
+                            colorDot.style.backgroundColor = color;
+                            btn.appendChild(colorDot);
+
+                            const nameSpan = document.createElement('span');
+                            nameSpan.textContent = name.replace('-face', '').replace('Detector', '');
+                            btn.appendChild(nameSpan);
+
+                            if (!detectorsData[name].available) {
+                                btn.classList.add('unavailable');
+                                btn.title = 'Non disponible';
+                            }
+
+                            if (selectedDetectors.includes(name)) {
+                                btn.classList.add('active');
+                                btn.style.borderColor = color;
+                            }
+
+                            btn.onclick = () => toggleDetector(name, btn);
+                            gridDiv.appendChild(btn);
+                        }
+                    }
+
+                    categoryDiv.appendChild(gridDiv);
+                    detectorsListEl.appendChild(categoryDiv);
+                }
+
+            } catch (err) {
+                console.error('Error loading detectors:', err);
+                detectorsListEl.innerHTML = '<p class="error-message">Erreur de chargement</p>';
+            }
+        }
+
+        function toggleDetector(name, btn) {
+            if (btn.classList.contains('unavailable')) return;
+
+            const color = getDetectorColor(name);
+
+            if (mode === 'single') {
+                selectedDetectors = [name];
+                updateDetectorButtons();
+            } else {
+                const index = selectedDetectors.indexOf(name);
+                if (index > -1) {
+                    selectedDetectors.splice(index, 1);
+                    btn.classList.remove('active');
+                    btn.style.borderColor = 'transparent';
+                    delete lastResults[name];
+                } else {
+                    selectedDetectors.push(name);
+                    btn.classList.add('active');
+                    btn.style.borderColor = color;
+                }
+            }
+
+            updateResultsPanel();
+            updateLegend();
+        }
+
+        function updateDetectorButtons() {
+            document.querySelectorAll('.detector-btn').forEach(btn => {
+                const name = btn.dataset.detector;
+                const color = getDetectorColor(name);
+                if (selectedDetectors.includes(name)) {
+                    btn.classList.add('active');
+                    btn.style.borderColor = color;
+                } else {
+                    btn.classList.remove('active');
+                    btn.style.borderColor = 'transparent';
+                }
+            });
+        }
+
+        function clearSelection() {
+            selectedDetectors = [];
+            lastResults = {};
+            updateDetectorButtons();
+            updateResultsPanel();
+            updateLegend();
+            overlayCtx.clearRect(0, 0, overlay.width, overlay.height);
+        }
+
+        function updateResultsPanel() {
+            if (Object.keys(lastResults).length === 0) {
+                if (selectedDetectors.length === 0) {
+                    resultsListEl.innerHTML = '<p style="color: #666; text-align: center;">Selectionnez des detecteurs</p>';
+                } else {
+                    resultsListEl.innerHTML = '<p style="color: #666; text-align: center;">Detection en cours...</p>';
+                }
+                return;
+            }
+
+            resultsListEl.innerHTML = '';
+
+            for (const [name, data] of Object.entries(lastResults)) {
+                const item = document.createElement('div');
+                item.className = 'result-item';
+
+                const color = data.color || getDetectorColor(name);
+
+                item.innerHTML = `
+                    <div class="name">
+                        <span class="color-indicator" style="background-color: ${color}"></span>
+                        <span>${name}</span>
+                    </div>
+                    <div class="stats">
+                        <span class="faces">${data.faces_count}</span>
+                        <span class="time">${data.time_ms}ms</span>
+                    </div>
+                `;
+
+                resultsListEl.appendChild(item);
+            }
+        }
+
+        function updateLegend() {
+            if (selectedDetectors.length === 0 || Object.keys(lastResults).length === 0) {
+                legendEl.style.display = 'none';
+                return;
+            }
+
+            legendEl.style.display = 'block';
+            legendEl.innerHTML = '';
+
+            for (const [name, data] of Object.entries(lastResults)) {
+                const color = getDetectorColor(name);
+                const item = document.createElement('div');
+                item.className = 'legend-item';
+                item.innerHTML = `
+                    <span class="legend-color" style="background-color: ${color}"></span>
+                    <span class="legend-text">${name}</span>
+                    <span class="legend-stats">${data.faces_count} | ${data.time_ms}ms</span>
+                `;
+                legendEl.appendChild(item);
+            }
+        }
+
+        // Draw boxes overlay (called every animation frame)
+        function drawOverlay() {
+            overlayCtx.clearRect(0, 0, overlay.width, overlay.height);
+
+            // Scale factor if canvas display size differs from internal size
+            const displayWidth = overlay.clientWidth;
+            const displayHeight = overlay.clientHeight;
+            const scaleX = displayWidth / overlay.width;
+            const scaleY = displayHeight / overlay.height;
+
+            if (Object.keys(lastResults).length > 0) {
+                for (const [name, data] of Object.entries(lastResults)) {
+                    if (!data.boxes || data.boxes.length === 0) continue;
+
+                    const color = getDetectorColor(name);
+                    overlayCtx.strokeStyle = color;
+                    overlayCtx.lineWidth = 3;
+                    overlayCtx.font = 'bold 14px sans-serif';
+
+                    for (const box of data.boxes) {
+                        const [x, y, w, h, conf] = box;
+
+                        // Draw rectangle
+                        overlayCtx.strokeRect(x, y, w, h);
+
+                        // Draw label background
+                        const label = `${name.substring(0, 10)} ${(conf * 100).toFixed(0)}%`;
+                        const textMetrics = overlayCtx.measureText(label);
+                        const textHeight = 16;
+
+                        overlayCtx.fillStyle = color;
+                        overlayCtx.fillRect(x, y - textHeight - 6, textMetrics.width + 10, textHeight + 6);
+
+                        // Draw label text
+                        overlayCtx.fillStyle = '#000';
+                        overlayCtx.fillText(label, x + 5, y - 6);
+                    }
+                }
+            }
+
+            requestAnimationFrame(drawOverlay);
+        }
+
+        // Detection loop (runs independently)
+        async function detectionLoop() {
+            if (!detectionEnabled || selectedDetectors.length === 0 || isDetecting) {
+                setTimeout(detectionLoop, 50);
+                return;
+            }
+
+            isDetecting = true;
+            statusDot.classList.add('processing');
+
+            // Capture frame (not mirrored for backend processing)
+            captureCtx.drawImage(video, 0, 0);
+            const imageData = captureCanvas.toDataURL('image/jpeg', 0.8);
+
+            try {
+                const response = await fetch('/api/detect_multi', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        image: imageData,
+                        detectors: selectedDetectors
+                    })
+                });
+
+                const result = await response.json();
+                console.log('Detection result:', result);
+
+                if (result.success) {
+                    // Update results (keep boxes for overlay)
+                    lastResults = result.results;
+                    console.log('Boxes:', lastResults);
+                    updateResultsPanel();
+                    updateLegend();
+                }
+
+            } catch (err) {
+                console.error('API error:', err);
+            }
+
+            isDetecting = false;
+            statusDot.classList.remove('processing');
+
+            setTimeout(detectionLoop, detectionInterval);
+        }
+
+        // Event listeners
+        document.getElementById('detection-toggle').addEventListener('change', (e) => {
+            detectionEnabled = e.target.checked;
+            if (!detectionEnabled) {
+                lastResults = {};
+                overlayCtx.clearRect(0, 0, overlay.width, overlay.height);
+                updateLegend();
+            }
+        });
+
+        document.getElementById('interval-slider').addEventListener('input', (e) => {
+            detectionInterval = parseInt(e.target.value);
+            document.getElementById('interval-value').textContent = detectionInterval;
+        });
+
+        // Initialize
+        async function init() {
+            await loadDetectors();
+            const webcamOk = await initWebcam();
+
+            if (webcamOk) {
+                // Start overlay drawing loop (smooth, always running)
+                requestAnimationFrame(drawOverlay);
+
+                // Start detection loop (independent, won't block video)
+                detectionLoop();
+            }
+        }
+
+        init();
+    </script>
+</body>
+</html>

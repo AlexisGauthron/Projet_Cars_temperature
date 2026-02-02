@@ -18,7 +18,7 @@ from core.structures import BBox
 
 
 # Répertoire racine du dataset
-SVIRO_SUBSET_DIR = Path(__file__).parent / "sviro_subset"
+SVIRO_SUBSET_DIR = Path(__file__).parent / "data" / "sviro_subset"
 
 
 class SVIROSubsetDataset(BaseDataset):

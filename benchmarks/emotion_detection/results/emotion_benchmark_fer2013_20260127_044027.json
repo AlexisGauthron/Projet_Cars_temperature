@@ -1,0 +1,249 @@
+{
+  "metadata": {
+    "timestamp": "2026-01-27T04:40:27.997539",
+    "dataset": "fer2013",
+    "num_classifiers": 4
+  },
+  "results": {
+    "DeepFace": {
+      "classifier": "DeepFace",
+      "total_samples": 30,
+      "accuracy": 80.0,
+      "macro_f1": 12.7,
+      "weighted_f1": 88.89,
+      "avg_time_ms": 4.19,
+      "fps": 238.5,
+      "per_class": {
+        "ANGRY": {
+          "accuracy": 0.0,
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0,
+          "support": 0
+        },
+        "DISGUST": {
+          "accuracy": 0.0,
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0,
+          "support": 0
+        },
+        "FEAR": {
+          "accuracy": 0.0,
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0,
+          "support": 0
+        },
+        "HAPPY": {
+          "accuracy": 80.0,
+          "precision": 100.0,
+          "recall": 80.0,
+          "f1": 88.89,
+          "support": 30
+        },
+        "SAD": {
+          "accuracy": 0.0,
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0,
+          "support": 0
+        },
+        "SURPRISE": {
+          "accuracy": 0.0,
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0,
+          "support": 0
+        },
+        "NEUTRAL": {
+          "accuracy": 0.0,
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0,
+          "support": 0
+        }
+      }
+    },
+    "HSEmotion-ONNX": {
+      "classifier": "HSEmotion-ONNX",
+      "total_samples": 30,
+      "accuracy": 0.0,
+      "macro_f1": 0.0,
+      "weighted_f1": 0.0,
+      "avg_time_ms": 18.84,
+      "fps": 53.1,
+      "per_class": {
+        "ANGRY": {
+          "accuracy": 0.0,
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0,
+          "support": 0
+        },
+        "DISGUST": {
+          "accuracy": 0.0,
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0,
+          "support": 0
+        },
+        "FEAR": {
+          "accuracy": 0.0,
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0,
+          "support": 0
+        },
+        "HAPPY": {
+          "accuracy": 0.0,
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0,
+          "support": 30
+        },
+        "SAD": {
+          "accuracy": 0.0,
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0,
+          "support": 0
+        },
+        "SURPRISE": {
+          "accuracy": 0.0,
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0,
+          "support": 0
+        },
+        "NEUTRAL": {
+          "accuracy": 0.0,
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0,
+          "support": 0
+        }
+      }
+    },
+    "ViT-FER": {
+      "classifier": "ViT-FER",
+      "total_samples": 30,
+      "accuracy": 93.33,
+      "macro_f1": 13.79,
+      "weighted_f1": 96.55,
+      "avg_time_ms": 54.57,
+      "fps": 18.3,
+      "per_class": {
+        "ANGRY": {
+          "accuracy": 0.0,
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0,
+          "support": 0
+        },
+        "DISGUST": {
+          "accuracy": 0.0,
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0,
+          "support": 0
+        },
+        "FEAR": {
+          "accuracy": 0.0,
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0,
+          "support": 0
+        },
+        "HAPPY": {
+          "accuracy": 93.33,
+          "precision": 100.0,
+          "recall": 93.33,
+          "f1": 96.55,
+          "support": 30
+        },
+        "SAD": {
+          "accuracy": 0.0,
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0,
+          "support": 0
+        },
+        "SURPRISE": {
+          "accuracy": 0.0,
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0,
+          "support": 0
+        },
+        "NEUTRAL": {
+          "accuracy": 0.0,
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0,
+          "support": 0
+        }
+      }
+    },
+    "EfficientNet-B0": {
+      "classifier": "EfficientNet-B0",
+      "total_samples": 30,
+      "accuracy": 13.33,
+      "macro_f1": 3.36,
+      "weighted_f1": 23.53,
+      "avg_time_ms": 165.44,
+      "fps": 6.0,
+      "per_class": {
+        "ANGRY": {
+          "accuracy": 0.0,
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0,
+          "support": 0
+        },
+        "DISGUST": {
+          "accuracy": 0.0,
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0,
+          "support": 0
+        },
+        "FEAR": {
+          "accuracy": 0.0,
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0,
+          "support": 0
+        },
+        "HAPPY": {
+          "accuracy": 13.33,
+          "precision": 100.0,
+          "recall": 13.33,
+          "f1": 23.53,
+          "support": 30
+        },
+        "SAD": {
+          "accuracy": 0.0,
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0,
+          "support": 0
+        },
+        "SURPRISE": {
+          "accuracy": 0.0,
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0,
+          "support": 0
+        },
+        "NEUTRAL": {
+          "accuracy": 0.0,
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0,
+          "support": 0
+        }
+      }
+    }
+  }
+}
