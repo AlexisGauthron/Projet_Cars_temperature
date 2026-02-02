@@ -1,0 +1,783 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Emotion Detection - Web Tester</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            color: #eee;
+            min-height: 100vh;
+        }
+
+        .header {
+            background: rgba(22, 33, 62, 0.9);
+            padding: 1rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 2px solid #e94560;
+            backdrop-filter: blur(10px);
+        }
+
+        .header h1 {
+            font-size: 1.5rem;
+            background: linear-gradient(90deg, #e94560, #ff6b6b);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .status {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .status-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #4ade80;
+            animation: pulse 2s infinite;
+        }
+
+        .status-dot.processing { background: #fbbf24; }
+        .status-dot.error { background: #ef4444; }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .container {
+            display: grid;
+            grid-template-columns: 1fr 380px;
+            gap: 1rem;
+            padding: 1rem;
+            max-width: 1600px;
+            margin: 0 auto;
+        }
+
+        .video-section {
+            background: rgba(22, 33, 62, 0.8);
+            border-radius: 16px;
+            overflow: hidden;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        }
+
+        .video-container {
+            position: relative;
+            aspect-ratio: 4/3;
+            background: #000;
+        }
+
+        #video {
+            width: 100%;
+            height: 100%;
+            object-fit: fill;
+        }
+
+        #overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+        }
+
+        #captureCanvas { display: none; }
+
+        .emotion-display {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.8);
+            padding: 15px 30px;
+            border-radius: 12px;
+            text-align: center;
+            min-width: 200px;
+        }
+
+        .emotion-display .emotion-label {
+            font-size: 2rem;
+            font-weight: bold;
+            text-transform: uppercase;
+            margin-bottom: 5px;
+        }
+
+        .emotion-display .confidence {
+            font-size: 0.9rem;
+            color: #888;
+        }
+
+        .sidebar {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+            max-height: calc(100vh - 100px);
+            overflow-y: auto;
+        }
+
+        .panel {
+            background: rgba(22, 33, 62, 0.8);
+            border-radius: 12px;
+            padding: 1rem;
+            backdrop-filter: blur(10px);
+        }
+
+        .panel h2 {
+            font-size: 1rem;
+            color: #e94560;
+            margin-bottom: 1rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 1px solid rgba(233, 69, 96, 0.3);
+        }
+
+        .classifier-category {
+            margin-bottom: 1rem;
+        }
+
+        .classifier-category h3 {
+            font-size: 0.7rem;
+            color: #888;
+            text-transform: uppercase;
+            margin-bottom: 0.5rem;
+            letter-spacing: 1px;
+        }
+
+        .classifier-grid {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+        }
+
+        .classifier-btn {
+            padding: 0.5rem 0.75rem;
+            border: 2px solid transparent;
+            border-radius: 8px;
+            background: rgba(15, 52, 96, 0.8);
+            color: #ccc;
+            cursor: pointer;
+            font-size: 0.8rem;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .classifier-btn:hover {
+            background: rgba(26, 74, 122, 0.8);
+            color: #fff;
+            transform: translateY(-1px);
+        }
+
+        .classifier-btn.active {
+            color: #fff;
+            border-color: currentColor;
+            box-shadow: 0 0 10px currentColor;
+        }
+
+        .classifier-btn.unavailable {
+            opacity: 0.3;
+            cursor: not-allowed;
+        }
+
+        .classifier-btn .color-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+        }
+
+        .controls {
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+        }
+
+        .control-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .control-row label {
+            font-size: 0.9rem;
+            color: #aaa;
+        }
+
+        .toggle {
+            position: relative;
+            width: 50px;
+            height: 26px;
+        }
+
+        .toggle input { opacity: 0; width: 0; height: 0; }
+
+        .toggle-slider {
+            position: absolute;
+            cursor: pointer;
+            inset: 0;
+            background: #0f3460;
+            border-radius: 26px;
+            transition: 0.3s;
+        }
+
+        .toggle-slider:before {
+            position: absolute;
+            content: "";
+            height: 20px;
+            width: 20px;
+            left: 3px;
+            bottom: 3px;
+            background: #fff;
+            border-radius: 50%;
+            transition: 0.3s;
+        }
+
+        .toggle input:checked + .toggle-slider { background: #e94560; }
+        .toggle input:checked + .toggle-slider:before { transform: translateX(24px); }
+
+        .results-panel {
+            max-height: 350px;
+            overflow-y: auto;
+        }
+
+        .result-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.75rem;
+            margin-bottom: 0.5rem;
+            background: rgba(15, 52, 96, 0.5);
+            border-radius: 8px;
+            border-left: 3px solid;
+        }
+
+        .result-item .classifier-name {
+            font-weight: bold;
+            font-size: 0.85rem;
+        }
+
+        .result-item .emotion-info {
+            text-align: right;
+        }
+
+        .result-item .emotion {
+            font-size: 1.1rem;
+            font-weight: bold;
+        }
+
+        .result-item .meta {
+            font-size: 0.75rem;
+            color: #888;
+        }
+
+        .emotion-bars {
+            margin-top: 1rem;
+        }
+
+        .emotion-bar {
+            display: flex;
+            align-items: center;
+            margin-bottom: 0.5rem;
+        }
+
+        .emotion-bar .label {
+            width: 70px;
+            font-size: 0.75rem;
+            text-transform: capitalize;
+        }
+
+        .emotion-bar .bar-container {
+            flex: 1;
+            height: 8px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .emotion-bar .bar-fill {
+            height: 100%;
+            border-radius: 4px;
+            transition: width 0.3s ease;
+        }
+
+        .emotion-bar .value {
+            width: 45px;
+            text-align: right;
+            font-size: 0.75rem;
+            color: #888;
+        }
+
+        .btn-clear {
+            width: 100%;
+            padding: 0.6rem;
+            border: none;
+            border-radius: 8px;
+            background: linear-gradient(135deg, #7f1d1d, #991b1b);
+            color: #fecaca;
+            cursor: pointer;
+            font-size: 0.85rem;
+            margin-top: 0.5rem;
+            transition: all 0.2s;
+        }
+
+        .btn-clear:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(153, 27, 27, 0.4);
+        }
+
+        @media (max-width: 1024px) {
+            .container { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Emotion Detection - Web Tester</h1>
+        <div class="status">
+            <span id="status-text">Chargement...</span>
+            <div class="status-dot" id="status-dot"></div>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="video-section">
+            <div class="video-container">
+                <video id="video" autoplay playsinline muted></video>
+                <canvas id="overlay"></canvas>
+                <canvas id="captureCanvas"></canvas>
+
+                <div class="emotion-display" id="emotion-display" style="display: none;">
+                    <div class="emotion-label" id="main-emotion">-</div>
+                    <div class="confidence" id="main-confidence">-</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="sidebar">
+            <div class="panel">
+                <h2>Classifieurs</h2>
+                <div id="classifiers-list">
+                    <p>Chargement...</p>
+                </div>
+            </div>
+
+            <div class="panel">
+                <h2>Controles</h2>
+                <div class="controls">
+                    <div class="control-row">
+                        <label>Detection active</label>
+                        <label class="toggle">
+                            <input type="checkbox" id="detection-toggle" checked>
+                            <span class="toggle-slider"></span>
+                        </label>
+                    </div>
+                    <div class="control-row">
+                        <label>Interval: <span id="interval-value">150</span>ms</label>
+                        <input type="range" id="interval-slider" min="50" max="1000" value="150" style="width: 120px;">
+                    </div>
+                </div>
+            </div>
+
+            <div class="panel">
+                <h2>Resultats</h2>
+                <div class="results-panel" id="results-list">
+                    <p style="color: #666; text-align: center;">Selectionnez des classifieurs</p>
+                </div>
+
+                <div class="emotion-bars" id="emotion-bars" style="display: none;">
+                    <h3 style="font-size: 0.8rem; color: #888; margin-bottom: 0.5rem;">Distribution</h3>
+                </div>
+
+                <button class="btn-clear" onclick="clearSelection()">Effacer la selection</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // State
+        let selectedClassifiers = ['hsemotion'];
+        let detectionEnabled = true;
+        let detectionInterval = 150;
+        let classifiersData = {};
+        let isDetecting = false;
+        let lastResults = {};
+
+        // Emotion colors
+        const EMOTION_COLORS = {
+            "angry": "#e74c3c",
+            "disgust": "#9b59b6",
+            "fear": "#8e44ad",
+            "happy": "#f1c40f",
+            "sad": "#3498db",
+            "surprise": "#e67e22",
+            "neutral": "#95a5a6",
+            "contempt": "#7f8c8d",
+        };
+
+        // Emojis for emotions
+        const EMOTION_EMOJIS = {
+            "angry": "😠",
+            "disgust": "🤢",
+            "fear": "😨",
+            "happy": "😊",
+            "sad": "😢",
+            "surprise": "😲",
+            "neutral": "😐",
+            "contempt": "😏",
+        };
+
+        // Categories
+        const CATEGORIES = {
+            'Production (pip)': ['deepface', 'hsemotion', 'hsemotion_onnx', 'fer_pytorch', 'rmn'],
+            'Transformers': ['vit', 'deit'],
+            'EfficientNet': ['efficientnet', 'efficientnet_b2', 'efficientnet_v2'],
+            'Autres': ['pyfeat', 'pyfeat_svm'],
+            'SOTA (manuel)': ['poster', 'poster_affectnet', 'dan', 'dan_affectnet'],
+        };
+
+        // Elements
+        const video = document.getElementById('video');
+        const overlay = document.getElementById('overlay');
+        const overlayCtx = overlay.getContext('2d');
+        const captureCanvas = document.getElementById('captureCanvas');
+        const captureCtx = captureCanvas.getContext('2d');
+        const statusText = document.getElementById('status-text');
+        const statusDot = document.getElementById('status-dot');
+        const classifiersListEl = document.getElementById('classifiers-list');
+        const resultsListEl = document.getElementById('results-list');
+        const emotionDisplay = document.getElementById('emotion-display');
+        const mainEmotion = document.getElementById('main-emotion');
+        const mainConfidence = document.getElementById('main-confidence');
+        const emotionBarsEl = document.getElementById('emotion-bars');
+
+        async function initWebcam() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    video: { width: 640, height: 480, facingMode: 'user' }
+                });
+                video.srcObject = stream;
+
+                return new Promise((resolve) => {
+                    video.onloadedmetadata = () => {
+                        video.play();
+                        overlay.width = video.videoWidth;
+                        overlay.height = video.videoHeight;
+                        captureCanvas.width = video.videoWidth;
+                        captureCanvas.height = video.videoHeight;
+                        statusText.textContent = 'Camera active';
+                        statusDot.classList.remove('error');
+                        resolve(true);
+                    };
+                });
+            } catch (err) {
+                console.error('Webcam error:', err);
+                statusText.textContent = 'Erreur camera';
+                statusDot.classList.add('error');
+                return false;
+            }
+        }
+
+        async function loadClassifiers() {
+            try {
+                const response = await fetch('/api/classifiers');
+                classifiersData = await response.json();
+
+                classifiersListEl.innerHTML = '';
+
+                for (const [category, names] of Object.entries(CATEGORIES)) {
+                    const hasAny = names.some(n => classifiersData[n]);
+                    if (!hasAny) continue;
+
+                    const categoryDiv = document.createElement('div');
+                    categoryDiv.className = 'classifier-category';
+
+                    const categoryTitle = document.createElement('h3');
+                    categoryTitle.textContent = category;
+                    categoryDiv.appendChild(categoryTitle);
+
+                    const gridDiv = document.createElement('div');
+                    gridDiv.className = 'classifier-grid';
+
+                    for (const name of names) {
+                        if (!classifiersData[name]) continue;
+
+                        const btn = document.createElement('button');
+                        btn.className = 'classifier-btn';
+                        btn.dataset.classifier = name;
+
+                        const color = classifiersData[name].color || '#888';
+                        const colorDot = document.createElement('span');
+                        colorDot.className = 'color-dot';
+                        colorDot.style.backgroundColor = color;
+                        btn.appendChild(colorDot);
+
+                        const nameSpan = document.createElement('span');
+                        nameSpan.textContent = classifiersData[name].name || name;
+                        btn.appendChild(nameSpan);
+
+                        if (!classifiersData[name].available) {
+                            btn.classList.add('unavailable');
+                            btn.title = 'Non disponible';
+                        }
+
+                        if (selectedClassifiers.includes(name)) {
+                            btn.classList.add('active');
+                            btn.style.borderColor = color;
+                            btn.style.color = color;
+                        }
+
+                        btn.onclick = () => toggleClassifier(name, btn);
+                        gridDiv.appendChild(btn);
+                    }
+
+                    categoryDiv.appendChild(gridDiv);
+                    classifiersListEl.appendChild(categoryDiv);
+                }
+
+            } catch (err) {
+                console.error('Error loading classifiers:', err);
+                classifiersListEl.innerHTML = '<p style="color: #e74c3c;">Erreur de chargement</p>';
+            }
+        }
+
+        function toggleClassifier(name, btn) {
+            if (btn.classList.contains('unavailable')) return;
+
+            const color = classifiersData[name]?.color || '#888';
+
+            const index = selectedClassifiers.indexOf(name);
+            if (index > -1) {
+                selectedClassifiers.splice(index, 1);
+                btn.classList.remove('active');
+                btn.style.borderColor = 'transparent';
+                btn.style.color = '#ccc';
+            } else {
+                selectedClassifiers.push(name);
+                btn.classList.add('active');
+                btn.style.borderColor = color;
+                btn.style.color = color;
+            }
+
+            if (selectedClassifiers.length === 0) {
+                emotionDisplay.style.display = 'none';
+                emotionBarsEl.style.display = 'none';
+            }
+        }
+
+        function clearSelection() {
+            selectedClassifiers = [];
+            lastResults = {};
+            document.querySelectorAll('.classifier-btn').forEach(btn => {
+                btn.classList.remove('active');
+                btn.style.borderColor = 'transparent';
+                btn.style.color = '#ccc';
+            });
+            resultsListEl.innerHTML = '<p style="color: #666; text-align: center;">Selectionnez des classifieurs</p>';
+            emotionDisplay.style.display = 'none';
+            emotionBarsEl.style.display = 'none';
+            overlayCtx.clearRect(0, 0, overlay.width, overlay.height);
+        }
+
+        function updateResults(faces, resultsByClassifier) {
+            if (Object.keys(resultsByClassifier).length === 0) {
+                resultsListEl.innerHTML = '<p style="color: #666; text-align: center;">Aucun visage detecte</p>';
+                emotionDisplay.style.display = 'none';
+                return;
+            }
+
+            resultsListEl.innerHTML = '';
+
+            // Find dominant emotion across classifiers
+            let dominantEmotion = null;
+            let dominantConfidence = 0;
+            let avgProbabilities = {};
+
+            for (const [name, data] of Object.entries(resultsByClassifier)) {
+                const color = classifiersData[name]?.color || '#888';
+                const emotionColor = EMOTION_COLORS[data.emotion] || '#888';
+                const emoji = EMOTION_EMOJIS[data.emotion] || '';
+
+                const item = document.createElement('div');
+                item.className = 'result-item';
+                item.style.borderLeftColor = color;
+
+                item.innerHTML = `
+                    <div class="classifier-name" style="color: ${color}">${classifiersData[name]?.name || name}</div>
+                    <div class="emotion-info">
+                        <div class="emotion" style="color: ${emotionColor}">${emoji} ${data.emotion}</div>
+                        <div class="meta">${(data.confidence * 100).toFixed(1)}% | ${data.time_ms}ms</div>
+                    </div>
+                `;
+
+                resultsListEl.appendChild(item);
+
+                // Track dominant
+                if (data.confidence > dominantConfidence) {
+                    dominantConfidence = data.confidence;
+                    dominantEmotion = data.emotion;
+                }
+
+                // Average probabilities
+                if (data.probabilities) {
+                    for (const [emo, prob] of Object.entries(data.probabilities)) {
+                        avgProbabilities[emo] = (avgProbabilities[emo] || 0) + prob;
+                    }
+                }
+            }
+
+            // Update main display
+            if (dominantEmotion) {
+                emotionDisplay.style.display = 'block';
+                const emoji = EMOTION_EMOJIS[dominantEmotion] || '';
+                mainEmotion.textContent = `${emoji} ${dominantEmotion}`;
+                mainEmotion.style.color = EMOTION_COLORS[dominantEmotion] || '#fff';
+                mainConfidence.textContent = `${(dominantConfidence * 100).toFixed(1)}% confiance`;
+            }
+
+            // Update emotion bars
+            const numClassifiers = Object.keys(resultsByClassifier).length;
+            if (numClassifiers > 0 && Object.keys(avgProbabilities).length > 0) {
+                emotionBarsEl.style.display = 'block';
+                emotionBarsEl.innerHTML = '<h3 style="font-size: 0.8rem; color: #888; margin-bottom: 0.5rem;">Distribution</h3>';
+
+                // Sort by probability
+                const sorted = Object.entries(avgProbabilities)
+                    .map(([emo, prob]) => [emo, prob / numClassifiers])
+                    .sort((a, b) => b[1] - a[1]);
+
+                for (const [emo, prob] of sorted) {
+                    const color = EMOTION_COLORS[emo] || '#888';
+                    const bar = document.createElement('div');
+                    bar.className = 'emotion-bar';
+                    bar.innerHTML = `
+                        <span class="label">${emo}</span>
+                        <div class="bar-container">
+                            <div class="bar-fill" style="width: ${prob * 100}%; background: ${color}"></div>
+                        </div>
+                        <span class="value">${(prob * 100).toFixed(1)}%</span>
+                    `;
+                    emotionBarsEl.appendChild(bar);
+                }
+            }
+        }
+
+        function drawOverlay(faces) {
+            overlayCtx.clearRect(0, 0, overlay.width, overlay.height);
+
+            if (!faces || faces.length === 0) return;
+
+            for (const face of faces) {
+                const [x, y, w, h] = face.box;
+
+                // Get dominant emotion for this face
+                let dominantEmotion = 'neutral';
+                let dominantConf = 0;
+
+                for (const [classifier, data] of Object.entries(face.emotions || {})) {
+                    if (data.confidence > dominantConf) {
+                        dominantConf = data.confidence;
+                        dominantEmotion = data.emotion;
+                    }
+                }
+
+                const color = EMOTION_COLORS[dominantEmotion] || '#888';
+
+                // Draw box
+                overlayCtx.strokeStyle = color;
+                overlayCtx.lineWidth = 3;
+                overlayCtx.strokeRect(x, y, w, h);
+
+                // Draw label
+                const emoji = EMOTION_EMOJIS[dominantEmotion] || '';
+                const label = `${emoji} ${dominantEmotion} ${(dominantConf * 100).toFixed(0)}%`;
+
+                overlayCtx.font = 'bold 14px sans-serif';
+                const textMetrics = overlayCtx.measureText(label);
+
+                overlayCtx.fillStyle = color;
+                overlayCtx.fillRect(x, y - 22, textMetrics.width + 12, 22);
+
+                overlayCtx.fillStyle = '#000';
+                overlayCtx.fillText(label, x + 6, y - 6);
+            }
+        }
+
+        async function detectionLoop() {
+            if (!detectionEnabled || selectedClassifiers.length === 0 || isDetecting) {
+                setTimeout(detectionLoop, 50);
+                return;
+            }
+
+            isDetecting = true;
+            statusDot.classList.add('processing');
+
+            captureCtx.drawImage(video, 0, 0);
+            const imageData = captureCanvas.toDataURL('image/jpeg', 0.85);
+
+            try {
+                const response = await fetch('/api/detect', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        image: imageData,
+                        classifiers: selectedClassifiers
+                    })
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    lastResults = result.results_by_classifier;
+                    updateResults(result.faces, result.results_by_classifier);
+                    drawOverlay(result.faces);
+                }
+
+            } catch (err) {
+                console.error('API error:', err);
+            }
+
+            isDetecting = false;
+            statusDot.classList.remove('processing');
+
+            setTimeout(detectionLoop, detectionInterval);
+        }
+
+        // Event listeners
+        document.getElementById('detection-toggle').addEventListener('change', (e) => {
+            detectionEnabled = e.target.checked;
+            if (!detectionEnabled) {
+                emotionDisplay.style.display = 'none';
+                overlayCtx.clearRect(0, 0, overlay.width, overlay.height);
+            }
+        });
+
+        document.getElementById('interval-slider').addEventListener('input', (e) => {
+            detectionInterval = parseInt(e.target.value);
+            document.getElementById('interval-value').textContent = detectionInterval;
+        });
+
+        // Init
+        async function init() {
+            await loadClassifiers();
+            const webcamOk = await initWebcam();
+            if (webcamOk) {
+                detectionLoop();
+            }
+        }
+
+        init();
+    </script>
+</body>
+</html>

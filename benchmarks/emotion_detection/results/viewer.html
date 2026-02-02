@@ -1,0 +1,950 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Emotion Detection Benchmark - Viewer</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --bg-primary: #0f172a;
+            --bg-secondary: #1e293b;
+            --bg-card: #334155;
+            --text-primary: #f1f5f9;
+            --text-secondary: #94a3b8;
+            --accent: #8b5cf6;
+            --accent-hover: #7c3aed;
+            --success: #22c55e;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --info: #3b82f6;
+            --border: #475569;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 2rem;
+            padding-bottom: 2rem;
+            border-bottom: 1px solid var(--border);
+        }
+
+        header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 0.5rem;
+            background: linear-gradient(135deg, var(--accent), #ec4899);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        header p {
+            color: var(--text-secondary);
+        }
+
+        /* Drop Zone */
+        .drop-zone {
+            border: 3px dashed var(--border);
+            border-radius: 1rem;
+            padding: 3rem;
+            text-align: center;
+            transition: all 0.3s ease;
+            cursor: pointer;
+            margin-bottom: 2rem;
+        }
+
+        .drop-zone:hover, .drop-zone.dragover {
+            border-color: var(--accent);
+            background: rgba(139, 92, 246, 0.1);
+        }
+
+        .drop-zone-icon { font-size: 4rem; margin-bottom: 1rem; }
+        .drop-zone h3 { margin-bottom: 0.5rem; }
+        .drop-zone p { color: var(--text-secondary); font-size: 0.9rem; }
+        #file-input { display: none; }
+        #results { display: none; }
+
+        /* Meta Info */
+        .meta-info {
+            background: var(--bg-secondary);
+            border-radius: 0.75rem;
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+            display: flex;
+            gap: 2rem;
+            flex-wrap: wrap;
+        }
+
+        .meta-item {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .meta-item span:first-child { color: var(--text-secondary); }
+
+        /* Section */
+        .section {
+            background: var(--bg-secondary);
+            border-radius: 0.75rem;
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .section h2 {
+            font-size: 1.5rem;
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        /* Key Metrics Cards */
+        .key-metrics {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+
+        .metric-card {
+            background: var(--bg-card);
+            border-radius: 0.75rem;
+            padding: 1.5rem;
+            text-align: center;
+            border-left: 4px solid var(--accent);
+        }
+
+        .metric-card.accuracy { border-left-color: var(--success); }
+        .metric-card.f1 { border-left-color: var(--info); }
+        .metric-card.speed { border-left-color: var(--warning); }
+        .metric-card.fps { border-left-color: var(--accent); }
+
+        .metric-card .label {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            margin-bottom: 0.5rem;
+        }
+
+        .metric-card .value {
+            font-size: 2rem;
+            font-weight: bold;
+        }
+
+        .metric-card .model {
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+            margin-top: 0.25rem;
+        }
+
+        .metric-card.accuracy .value { color: var(--success); }
+        .metric-card.f1 .value { color: var(--info); }
+        .metric-card.speed .value { color: var(--warning); }
+        .metric-card.fps .value { color: var(--accent); }
+
+        /* Table */
+        .table-container { overflow-x: auto; }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.9rem;
+        }
+
+        th, td {
+            padding: 0.75rem 1rem;
+            text-align: left;
+            border-bottom: 1px solid var(--border);
+        }
+
+        th {
+            background: var(--bg-card);
+            cursor: pointer;
+            user-select: none;
+            white-space: nowrap;
+            font-size: 0.85rem;
+        }
+
+        th:hover { background: var(--border); }
+        th.sorted-asc::after { content: ' ▲'; font-size: 0.7rem; }
+        th.sorted-desc::after { content: ' ▼'; font-size: 0.7rem; }
+        tr:hover td { background: var(--bg-card); }
+
+        .value-good { color: var(--success); font-weight: 600; }
+        .value-medium { color: var(--warning); }
+        .value-bad { color: var(--danger); }
+
+        .speed-badge {
+            display: inline-block;
+            padding: 0.25rem 0.5rem;
+            border-radius: 0.25rem;
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+
+        .speed-realtime { background: rgba(34, 197, 94, 0.2); color: var(--success); }
+        .speed-fast { background: rgba(59, 130, 246, 0.2); color: var(--info); }
+        .speed-slow { background: rgba(239, 68, 68, 0.2); color: var(--danger); }
+
+        /* Charts Grid */
+        .charts-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(450px, 1fr));
+            gap: 1.5rem;
+        }
+
+        .chart-card {
+            background: var(--bg-card);
+            border-radius: 0.75rem;
+            padding: 1.5rem;
+        }
+
+        .chart-card h3 { margin-bottom: 1rem; font-size: 1.1rem; }
+        .chart-container { position: relative; height: 350px; }
+
+        /* Emotions Grid */
+        .emotions-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: 1rem;
+        }
+
+        .emotion-card {
+            background: var(--bg-card);
+            border-radius: 0.75rem;
+            padding: 1rem;
+            text-align: center;
+        }
+
+        .emotion-icon {
+            font-size: 2rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .emotion-name {
+            font-weight: 600;
+            margin-bottom: 0.25rem;
+            text-transform: capitalize;
+        }
+
+        .emotion-score {
+            font-size: 1.5rem;
+            font-weight: bold;
+        }
+
+        .emotion-support {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+        }
+
+        /* Buttons */
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.75rem 1.5rem;
+            background: var(--accent);
+            color: white;
+            border: none;
+            border-radius: 0.5rem;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: background 0.2s ease;
+        }
+
+        .btn:hover { background: var(--accent-hover); }
+        .btn-secondary { background: var(--bg-card); }
+        .btn-secondary:hover { background: var(--border); }
+
+        .actions {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 1rem;
+            flex-wrap: wrap;
+        }
+
+        /* Ranking */
+        .ranking {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1rem;
+        }
+
+        .ranking-card {
+            background: var(--bg-card);
+            border-radius: 0.75rem;
+            padding: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            transition: transform 0.2s ease;
+        }
+
+        .ranking-card:hover { transform: translateY(-2px); }
+        .ranking-card.gold { background: linear-gradient(135deg, #fef3c7, #f59e0b); color: #78350f; }
+        .ranking-card.silver { background: linear-gradient(135deg, #e2e8f0, #94a3b8); color: #1e293b; }
+        .ranking-card.bronze { background: linear-gradient(135deg, #fed7aa, #ea580c); color: #7c2d12; }
+
+        .medal { font-size: 2.5rem; }
+        .ranking-info { flex: 1; }
+        .ranking-info h3 { font-size: 1.25rem; margin-bottom: 0.25rem; }
+        .ranking-info p { font-size: 0.9rem; opacity: 0.8; }
+        .ranking-score { font-size: 1.5rem; font-weight: bold; }
+
+        /* Per-class details */
+        .per-class-section {
+            margin-top: 1rem;
+        }
+
+        .classifier-select {
+            padding: 0.5rem 1rem;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 0.5rem;
+            color: var(--text-primary);
+            font-size: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        /* Footer */
+        footer {
+            text-align: center;
+            padding: 2rem;
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+        }
+
+        @media (max-width: 900px) {
+            .charts-grid { grid-template-columns: 1fr; }
+            .container { padding: 1rem; }
+            header h1 { font-size: 1.8rem; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Emotion Detection Benchmark</h1>
+            <p>Analyse des performances des classifieurs d'émotions</p>
+        </header>
+
+        <!-- Drop Zone -->
+        <div class="drop-zone" id="drop-zone">
+            <div class="drop-zone-icon">😊</div>
+            <h3>Glissez-déposez un fichier JSON</h3>
+            <p>ou cliquez pour sélectionner un fichier de benchmark</p>
+            <input type="file" id="file-input" accept=".json">
+        </div>
+
+        <!-- Results -->
+        <div id="results">
+            <!-- Meta Info -->
+            <div class="meta-info" id="meta-info">
+                <div class="meta-item">
+                    <span>📅 Date:</span>
+                    <strong id="meta-date">-</strong>
+                </div>
+                <div class="meta-item">
+                    <span>📊 Dataset:</span>
+                    <strong id="meta-dataset">-</strong>
+                </div>
+                <div class="meta-item">
+                    <span>🤖 Classifieurs:</span>
+                    <strong id="meta-classifiers">-</strong>
+                </div>
+                <div class="meta-item">
+                    <span>🖼️ Échantillons:</span>
+                    <strong id="meta-samples">-</strong>
+                </div>
+            </div>
+
+            <!-- Key Metrics Summary -->
+            <div class="key-metrics" id="key-metrics"></div>
+
+            <!-- Actions -->
+            <div class="actions">
+                <button class="btn" onclick="exportCSV()">📥 Exporter CSV</button>
+                <button class="btn btn-secondary" onclick="location.reload()">🔄 Charger autre fichier</button>
+            </div>
+
+            <!-- Ranking Section -->
+            <div class="section">
+                <h2>🏆 Classement par Accuracy</h2>
+                <div class="ranking" id="ranking"></div>
+            </div>
+
+            <!-- Comparison Table -->
+            <div class="section">
+                <h2>📋 Tableau Comparatif</h2>
+                <div class="table-container">
+                    <table id="comparison-table">
+                        <thead>
+                            <tr>
+                                <th data-sort="name">Classifieur</th>
+                                <th data-sort="accuracy">Accuracy ↑</th>
+                                <th data-sort="macro_f1">Macro F1 ↑</th>
+                                <th data-sort="weighted_f1">Weighted F1 ↑</th>
+                                <th data-sort="samples">Samples</th>
+                                <th data-sort="time">Temps (ms)</th>
+                                <th data-sort="fps">FPS</th>
+                                <th>Temps Réel</th>
+                            </tr>
+                        </thead>
+                        <tbody id="table-body"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Charts -->
+            <div class="section">
+                <h2>📈 Visualisations</h2>
+                <div class="charts-grid">
+                    <div class="chart-card">
+                        <h3>Accuracy par Classifieur</h3>
+                        <div class="chart-container">
+                            <canvas id="accuracy-chart"></canvas>
+                        </div>
+                    </div>
+                    <div class="chart-card">
+                        <h3>F1-Score (Macro vs Weighted)</h3>
+                        <div class="chart-container">
+                            <canvas id="f1-chart"></canvas>
+                        </div>
+                    </div>
+                    <div class="chart-card">
+                        <h3>Accuracy vs Vitesse (Trade-off)</h3>
+                        <div class="chart-container">
+                            <canvas id="tradeoff-chart"></canvas>
+                        </div>
+                    </div>
+                    <div class="chart-card">
+                        <h3>Performance par Émotion</h3>
+                        <div class="chart-container">
+                            <canvas id="emotion-chart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Per-class Performance -->
+            <div class="section">
+                <h2>🎭 Performance par Émotion</h2>
+                <div class="per-class-section">
+                    <select id="classifier-select" class="classifier-select" onchange="updateEmotionCards()">
+                    </select>
+                    <div class="emotions-grid" id="emotions-grid"></div>
+                </div>
+            </div>
+
+            <!-- Detailed Per-class Chart -->
+            <div class="section">
+                <h2>📊 Détails par Classe</h2>
+                <div class="chart-card" style="background: transparent;">
+                    <div class="chart-container" style="height: 400px;">
+                        <canvas id="per-class-chart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <footer>
+            <p>Emotion Detection Benchmark - ProjectCare DMS</p>
+        </footer>
+    </div>
+
+    <script>
+        let benchmarkData = null;
+        let charts = {};
+
+        const emotionIcons = {
+            'ANGRY': '😠',
+            'DISGUST': '🤢',
+            'FEAR': '😨',
+            'HAPPY': '😊',
+            'SAD': '😢',
+            'SURPRISE': '😲',
+            'NEUTRAL': '😐'
+        };
+
+        const emotionColors = {
+            'ANGRY': '#ef4444',
+            'DISGUST': '#22c55e',
+            'FEAR': '#8b5cf6',
+            'HAPPY': '#f59e0b',
+            'SAD': '#3b82f6',
+            'SURPRISE': '#ec4899',
+            'NEUTRAL': '#6b7280'
+        };
+
+        // Drop zone handling
+        const dropZone = document.getElementById('drop-zone');
+        const fileInput = document.getElementById('file-input');
+
+        dropZone.addEventListener('click', () => fileInput.click());
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.classList.add('dragover');
+        });
+        dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('dragover');
+            const file = e.dataTransfer.files[0];
+            if (file) loadFile(file);
+        });
+        fileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) loadFile(file);
+        });
+
+        function loadFile(file) {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    benchmarkData = JSON.parse(e.target.result);
+                    displayResults();
+                } catch (err) {
+                    alert('Erreur de lecture du fichier JSON: ' + err.message);
+                }
+            };
+            reader.readAsText(file);
+        }
+
+        function displayResults() {
+            document.getElementById('drop-zone').style.display = 'none';
+            document.getElementById('results').style.display = 'block';
+
+            const results = benchmarkData.results;
+            const classifiers = Object.keys(results);
+
+            // Meta info
+            const metadata = benchmarkData.metadata || {};
+            document.getElementById('meta-date').textContent = metadata.timestamp || '-';
+            document.getElementById('meta-dataset').textContent = metadata.dataset || '-';
+            document.getElementById('meta-classifiers').textContent = metadata.num_classifiers || classifiers.length;
+
+            const firstClassifier = results[classifiers[0]];
+            document.getElementById('meta-samples').textContent = firstClassifier?.total_samples || '-';
+
+            // Populate classifier select
+            const select = document.getElementById('classifier-select');
+            select.innerHTML = classifiers.map(c => `<option value="${c}">${c}</option>`).join('');
+
+            displayKeyMetrics(classifiers, results);
+            displayRanking(classifiers, results);
+            displayTable(classifiers, results);
+            displayCharts(classifiers, results);
+            updateEmotionCards();
+        }
+
+        function displayKeyMetrics(classifiers, results) {
+            const container = document.getElementById('key-metrics');
+
+            const validClassifiers = classifiers.filter(c => results[c].total_samples > 0);
+            if (validClassifiers.length === 0) {
+                container.innerHTML = '<p style="color: var(--text-secondary);">Aucune donnée valide</p>';
+                return;
+            }
+
+            const bestAccuracy = validClassifiers.reduce((a, b) => results[a].accuracy > results[b].accuracy ? a : b);
+            const bestF1 = validClassifiers.reduce((a, b) => results[a].weighted_f1 > results[b].weighted_f1 ? a : b);
+            const fastest = validClassifiers.reduce((a, b) => results[a].avg_time_ms < results[b].avg_time_ms ? a : b);
+            const bestFPS = validClassifiers.reduce((a, b) => results[a].fps > results[b].fps ? a : b);
+
+            container.innerHTML = `
+                <div class="metric-card accuracy">
+                    <div class="label">🎯 Meilleure Accuracy</div>
+                    <div class="value">${results[bestAccuracy].accuracy.toFixed(1)}%</div>
+                    <div class="model">${bestAccuracy}</div>
+                </div>
+                <div class="metric-card f1">
+                    <div class="label">📊 Meilleur F1 (Weighted)</div>
+                    <div class="value">${results[bestF1].weighted_f1.toFixed(1)}%</div>
+                    <div class="model">${bestF1}</div>
+                </div>
+                <div class="metric-card speed">
+                    <div class="label">⚡ Plus Rapide</div>
+                    <div class="value">${results[fastest].avg_time_ms.toFixed(1)}ms</div>
+                    <div class="model">${fastest}</div>
+                </div>
+                <div class="metric-card fps">
+                    <div class="label">🎬 Meilleur FPS</div>
+                    <div class="value">${results[bestFPS].fps.toFixed(1)}</div>
+                    <div class="model">${bestFPS}</div>
+                </div>
+            `;
+        }
+
+        function displayRanking(classifiers, results) {
+            const container = document.getElementById('ranking');
+            const medals = ['🥇', '🥈', '🥉'];
+            const classes = ['gold', 'silver', 'bronze'];
+
+            const sorted = [...classifiers]
+                .filter(c => results[c].total_samples > 0)
+                .sort((a, b) => results[b].accuracy - results[a].accuracy);
+
+            if (sorted.length === 0) {
+                container.innerHTML = '<p style="color: var(--text-secondary);">Aucune donnée valide</p>';
+                return;
+            }
+
+            container.innerHTML = sorted.slice(0, 5).map((name, i) => {
+                const medal = medals[i] || `#${i + 1}`;
+                const cls = classes[i] || '';
+                const r = results[name];
+                return `
+                    <div class="ranking-card ${cls}">
+                        <div class="medal">${medal}</div>
+                        <div class="ranking-info">
+                            <h3>${name}</h3>
+                            <p>F1: ${r.weighted_f1.toFixed(1)}% | ${r.fps.toFixed(0)} FPS</p>
+                        </div>
+                        <div class="ranking-score">${r.accuracy.toFixed(1)}%</div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function displayTable(classifiers, results) {
+            const tbody = document.getElementById('table-body');
+            const sorted = [...classifiers].sort((a, b) => results[b].accuracy - results[a].accuracy);
+
+            tbody.innerHTML = sorted.map(name => {
+                const r = results[name];
+                const isRealtime = r.fps >= 30;
+                const isFast = r.fps >= 15;
+
+                let speedClass = 'speed-slow';
+                let speedLabel = 'Lent';
+                if (isRealtime) { speedClass = 'speed-realtime'; speedLabel = '30+ FPS'; }
+                else if (isFast) { speedClass = 'speed-fast'; speedLabel = '15+ FPS'; }
+
+                return `
+                    <tr>
+                        <td><strong>${name}</strong></td>
+                        <td class="${getAccuracyClass(r.accuracy)}">${r.accuracy.toFixed(1)}%</td>
+                        <td>${r.macro_f1.toFixed(1)}%</td>
+                        <td>${r.weighted_f1.toFixed(1)}%</td>
+                        <td>${r.total_samples}</td>
+                        <td>${r.avg_time_ms.toFixed(1)}</td>
+                        <td>${r.fps.toFixed(1)}</td>
+                        <td><span class="speed-badge ${speedClass}">${speedLabel}</span></td>
+                    </tr>
+                `;
+            }).join('');
+
+            // Sortable headers
+            document.querySelectorAll('#comparison-table th[data-sort]').forEach(th => {
+                th.addEventListener('click', () => sortTable(th.dataset.sort));
+            });
+        }
+
+        function getAccuracyClass(value) {
+            if (value >= 80) return 'value-good';
+            if (value >= 60) return 'value-medium';
+            return 'value-bad';
+        }
+
+        let currentSort = { key: 'accuracy', desc: true };
+
+        function sortTable(key) {
+            const results = benchmarkData.results;
+            let classifiers = Object.keys(results);
+
+            if (currentSort.key === key) {
+                currentSort.desc = !currentSort.desc;
+            } else {
+                currentSort = { key, desc: key !== 'time' };
+            }
+
+            classifiers.sort((a, b) => {
+                let va, vb;
+                switch (key) {
+                    case 'name': va = a; vb = b; break;
+                    case 'accuracy': va = results[a].accuracy; vb = results[b].accuracy; break;
+                    case 'macro_f1': va = results[a].macro_f1; vb = results[b].macro_f1; break;
+                    case 'weighted_f1': va = results[a].weighted_f1; vb = results[b].weighted_f1; break;
+                    case 'samples': va = results[a].total_samples; vb = results[b].total_samples; break;
+                    case 'time': va = results[a].avg_time_ms; vb = results[b].avg_time_ms; break;
+                    case 'fps': va = results[a].fps; vb = results[b].fps; break;
+                }
+                if (typeof va === 'string') {
+                    return currentSort.desc ? vb.localeCompare(va) : va.localeCompare(vb);
+                }
+                return currentSort.desc ? vb - va : va - vb;
+            });
+
+            document.querySelectorAll('#comparison-table th').forEach(th => {
+                th.classList.remove('sorted-asc', 'sorted-desc');
+                if (th.dataset.sort === key) {
+                    th.classList.add(currentSort.desc ? 'sorted-desc' : 'sorted-asc');
+                }
+            });
+
+            displayTable(classifiers, results);
+        }
+
+        function displayCharts(classifiers, results) {
+            const validClassifiers = classifiers.filter(c => results[c].total_samples > 0);
+            const sortedByAccuracy = [...validClassifiers].sort((a, b) => results[b].accuracy - results[a].accuracy);
+
+            // Destroy existing charts
+            Object.values(charts).forEach(chart => chart.destroy());
+            charts = {};
+
+            // Accuracy Chart
+            charts.accuracy = new Chart(document.getElementById('accuracy-chart'), {
+                type: 'bar',
+                data: {
+                    labels: sortedByAccuracy,
+                    datasets: [{
+                        label: 'Accuracy (%)',
+                        data: sortedByAccuracy.map(c => results[c].accuracy),
+                        backgroundColor: sortedByAccuracy.map((_, i) =>
+                            `hsla(${280 - i * 30}, 70%, 60%, 0.8)`
+                        ),
+                        borderRadius: 6
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { ticks: { color: '#94a3b8' }, grid: { color: '#334155' } },
+                        y: {
+                            ticks: { color: '#94a3b8' },
+                            grid: { color: '#334155' },
+                            min: 0,
+                            max: 100,
+                            title: { display: true, text: 'Accuracy (%)', color: '#94a3b8' }
+                        }
+                    }
+                }
+            });
+
+            // F1 Chart
+            charts.f1 = new Chart(document.getElementById('f1-chart'), {
+                type: 'bar',
+                data: {
+                    labels: sortedByAccuracy,
+                    datasets: [
+                        {
+                            label: 'Macro F1',
+                            data: sortedByAccuracy.map(c => results[c].macro_f1),
+                            backgroundColor: 'rgba(59, 130, 246, 0.8)'
+                        },
+                        {
+                            label: 'Weighted F1',
+                            data: sortedByAccuracy.map(c => results[c].weighted_f1),
+                            backgroundColor: 'rgba(139, 92, 246, 0.8)'
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { labels: { color: '#f1f5f9' } } },
+                    scales: {
+                        x: { ticks: { color: '#94a3b8' }, grid: { color: '#334155' } },
+                        y: {
+                            ticks: { color: '#94a3b8' },
+                            grid: { color: '#334155' },
+                            min: 0,
+                            max: 100,
+                            title: { display: true, text: 'F1 Score (%)', color: '#94a3b8' }
+                        }
+                    }
+                }
+            });
+
+            // Trade-off Chart
+            charts.tradeoff = new Chart(document.getElementById('tradeoff-chart'), {
+                type: 'scatter',
+                data: {
+                    datasets: [{
+                        label: 'Classifieurs',
+                        data: validClassifiers.map(c => ({
+                            x: results[c].avg_time_ms,
+                            y: results[c].accuracy,
+                            label: c
+                        })),
+                        backgroundColor: validClassifiers.map((_, i) =>
+                            `hsla(${280 - i * 40}, 70%, 60%, 0.8)`
+                        ),
+                        pointRadius: 12
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                label: ctx => `${ctx.raw.label}: ${ctx.raw.y.toFixed(1)}% @ ${ctx.raw.x.toFixed(1)}ms`
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            title: { display: true, text: 'Temps (ms)', color: '#94a3b8' },
+                            ticks: { color: '#94a3b8' },
+                            grid: { color: '#334155' },
+                            type: 'logarithmic'
+                        },
+                        y: {
+                            title: { display: true, text: 'Accuracy (%)', color: '#94a3b8' },
+                            ticks: { color: '#94a3b8' },
+                            grid: { color: '#334155' },
+                            min: 0,
+                            max: 100
+                        }
+                    }
+                }
+            });
+
+            // Emotion Chart - Per-class F1 for best classifier
+            const bestClassifier = sortedByAccuracy[0];
+            if (bestClassifier) {
+                const perClass = results[bestClassifier].per_class || {};
+                const emotions = Object.keys(perClass).filter(e => perClass[e].support > 0);
+
+                charts.emotion = new Chart(document.getElementById('emotion-chart'), {
+                    type: 'radar',
+                    data: {
+                        labels: emotions.map(e => e.charAt(0) + e.slice(1).toLowerCase()),
+                        datasets: sortedByAccuracy.slice(0, 3).map((classifier, i) => ({
+                            label: classifier,
+                            data: emotions.map(e => results[classifier].per_class?.[e]?.f1 || 0),
+                            backgroundColor: `hsla(${280 - i * 60}, 70%, 60%, 0.2)`,
+                            borderColor: `hsla(${280 - i * 60}, 70%, 60%, 1)`,
+                            pointBackgroundColor: `hsla(${280 - i * 60}, 70%, 60%, 1)`
+                        }))
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: { legend: { labels: { color: '#f1f5f9' } } },
+                        scales: {
+                            r: {
+                                ticks: { color: '#94a3b8', backdropColor: 'transparent' },
+                                grid: { color: '#334155' },
+                                angleLines: { color: '#334155' },
+                                pointLabels: { color: '#f1f5f9' },
+                                min: 0,
+                                max: 100
+                            }
+                        }
+                    }
+                });
+
+                // Per-class detailed chart
+                displayPerClassChart(sortedByAccuracy, results);
+            }
+        }
+
+        function displayPerClassChart(classifiers, results) {
+            const emotions = Object.keys(emotionColors);
+
+            if (charts.perClass) charts.perClass.destroy();
+
+            charts.perClass = new Chart(document.getElementById('per-class-chart'), {
+                type: 'bar',
+                data: {
+                    labels: emotions.map(e => emotionIcons[e] + ' ' + e.charAt(0) + e.slice(1).toLowerCase()),
+                    datasets: classifiers.slice(0, 4).map((classifier, i) => ({
+                        label: classifier,
+                        data: emotions.map(e => results[classifier].per_class?.[e]?.f1 || 0),
+                        backgroundColor: `hsla(${280 - i * 50}, 70%, 60%, 0.8)`
+                    }))
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { labels: { color: '#f1f5f9' } } },
+                    scales: {
+                        x: { ticks: { color: '#94a3b8' }, grid: { color: '#334155' } },
+                        y: {
+                            ticks: { color: '#94a3b8' },
+                            grid: { color: '#334155' },
+                            min: 0,
+                            max: 100,
+                            title: { display: true, text: 'F1 Score (%)', color: '#94a3b8' }
+                        }
+                    }
+                }
+            });
+        }
+
+        function updateEmotionCards() {
+            const classifier = document.getElementById('classifier-select').value;
+            const results = benchmarkData.results;
+            const perClass = results[classifier]?.per_class || {};
+            const container = document.getElementById('emotions-grid');
+
+            const emotions = Object.keys(emotionIcons);
+
+            container.innerHTML = emotions.map(emotion => {
+                const data = perClass[emotion] || {};
+                const f1 = data.f1 || 0;
+                const support = data.support || 0;
+
+                let colorClass = 'value-bad';
+                if (f1 >= 70) colorClass = 'value-good';
+                else if (f1 >= 40) colorClass = 'value-medium';
+
+                return `
+                    <div class="emotion-card">
+                        <div class="emotion-icon">${emotionIcons[emotion]}</div>
+                        <div class="emotion-name">${emotion.toLowerCase()}</div>
+                        <div class="emotion-score ${colorClass}">${f1.toFixed(1)}%</div>
+                        <div class="emotion-support">${support} samples</div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function exportCSV() {
+            if (!benchmarkData) return;
+
+            const results = benchmarkData.results;
+            const classifiers = Object.keys(results);
+
+            let csv = 'Classifieur,Accuracy,Macro F1,Weighted F1,Samples,Temps (ms),FPS\n';
+
+            classifiers.forEach(name => {
+                const r = results[name];
+                csv += `${name},${r.accuracy.toFixed(1)},${r.macro_f1.toFixed(1)},${r.weighted_f1.toFixed(1)},${r.total_samples},${r.avg_time_ms.toFixed(1)},${r.fps.toFixed(1)}\n`;
+            });
+
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'emotion_benchmark_results.csv';
+            a.click();
+        }
+    </script>
+</body>
+</html>

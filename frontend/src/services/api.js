@@ -10,8 +10,10 @@ const apiClient = axios.create({
 export const api = {
   /**
    * Envoie une frame pour analyse d'émotions.
+   * @param {boolean} smoothing - true = lissé, false = émotions brutes
+   * @param {string} model - 'fer', 'hsemotion', 'deepface'
    */
-  async sendFrame(imageBase64, temperature, mode = 'single') {
+  async sendFrame(imageBase64, temperature, mode = 'single', smoothing = true, model = 'fer') {
     try {
       const response = await apiClient.post(
         API_CONFIG.ENDPOINTS.FRAME,
@@ -19,6 +21,8 @@ export const api = {
           image: imageBase64,
           temperature: temperature,
           mode: mode,
+          smoothing: smoothing,
+          model: model,
         },
         { timeout: API_CONFIG.TIMEOUT.FRAME }
       );

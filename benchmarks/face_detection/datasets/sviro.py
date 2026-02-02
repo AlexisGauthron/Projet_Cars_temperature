@@ -22,7 +22,7 @@ from core.structures import BBox
 
 
 # Répertoire racine du dataset
-SVIRO_DIR = Path(__file__).parent / "sviro"
+SVIRO_DIR = Path(__file__).parent / "data" / "sviro"
 
 
 class SVIRODataset(BaseDataset):

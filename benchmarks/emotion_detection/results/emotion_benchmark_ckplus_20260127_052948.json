@@ -1,0 +1,129 @@
+{
+  "metadata": {
+    "timestamp": "2026-01-27T05:29:48.875229",
+    "dataset": "ckplus",
+    "num_classifiers": 2
+  },
+  "results": {
+    "ViT-FER": {
+      "classifier": "ViT-FER",
+      "total_samples": 200,
+      "accuracy": 8.0,
+      "macro_f1": 2.12,
+      "weighted_f1": 14.81,
+      "avg_time_ms": 64.69,
+      "fps": 15.5,
+      "per_class": {
+        "ANGRY": {
+          "accuracy": 0.0,
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0,
+          "support": 0
+        },
+        "DISGUST": {
+          "accuracy": 0.0,
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0,
+          "support": 0
+        },
+        "FEAR": {
+          "accuracy": 0.0,
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0,
+          "support": 0
+        },
+        "HAPPY": {
+          "accuracy": 0.0,
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0,
+          "support": 0
+        },
+        "SAD": {
+          "accuracy": 8.0,
+          "precision": 100.0,
+          "recall": 8.0,
+          "f1": 14.81,
+          "support": 200
+        },
+        "SURPRISE": {
+          "accuracy": 0.0,
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0,
+          "support": 0
+        },
+        "NEUTRAL": {
+          "accuracy": 0.0,
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0,
+          "support": 0
+        }
+      }
+    },
+    "DeepFace": {
+      "classifier": "DeepFace",
+      "total_samples": 200,
+      "accuracy": 23.5,
+      "macro_f1": 5.44,
+      "weighted_f1": 38.06,
+      "avg_time_ms": 9.78,
+      "fps": 102.2,
+      "per_class": {
+        "ANGRY": {
+          "accuracy": 0.0,
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0,
+          "support": 0
+        },
+        "DISGUST": {
+          "accuracy": 0.0,
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0,
+          "support": 0
+        },
+        "FEAR": {
+          "accuracy": 0.0,
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0,
+          "support": 0
+        },
+        "HAPPY": {
+          "accuracy": 0.0,
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0,
+          "support": 0
+        },
+        "SAD": {
+          "accuracy": 23.5,
+          "precision": 100.0,
+          "recall": 23.5,
+          "f1": 38.06,
+          "support": 200
+        },
+        "SURPRISE": {
+          "accuracy": 0.0,
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0,
+          "support": 0
+        },
+        "NEUTRAL": {
+          "accuracy": 0.0,
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0,
+          "support": 0
+        }
+      }
+    }
+  }
+}

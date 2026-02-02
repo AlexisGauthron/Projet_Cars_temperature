@@ -144,23 +144,66 @@ fi
 echo -e "${GREEN}  ✓ Modèles prêts${NC}"
 
 # -----------------------------------------------------------------------------
-# 5. Vérification du dataset
+# 5. Vérification du dataset et Network Volume
 # -----------------------------------------------------------------------------
 echo ""
-echo -e "${YELLOW}[5/6] Vérification du dataset...${NC}"
+echo -e "${YELLOW}[5/6] Vérification des datasets...${NC}"
 
-# Vérifier si WIDER FACE est disponible
-if [ -d "datasets/wider_face" ] && [ -f "annotations/wider_face_split/wider_face_val_bbx_gt.txt" ]; then
-    IMAGES_COUNT=$(find datasets/wider_face -name "*.jpg" 2>/dev/null | wc -l)
-    echo -e "${GREEN}  ✓ WIDER FACE disponible ($IMAGES_COUNT images)${NC}"
-else
-    echo -e "${YELLOW}  ⚠ WIDER FACE non trouvé${NC}"
-    echo "    Pour télécharger: python scripts/download_datasets.py"
+# Vérifier si un Network Volume est monté avec les données
+NETWORK_VOLUME_DATA="/workspace/data"
 
-    # Créer les répertoires pour le téléchargement manuel
-    mkdir -p datasets/wider_face
-    mkdir -p annotations/wider_face_split
+if [ -d "$NETWORK_VOLUME_DATA/datasets" ]; then
+    echo -e "${GREEN}  ✓ Network Volume détecté: $NETWORK_VOLUME_DATA${NC}"
+
+    # Créer les symlinks si nécessaire
+    if [ ! -L "datasets" ] && [ ! -d "datasets" ]; then
+        ln -s "$NETWORK_VOLUME_DATA/datasets" datasets
+        echo "    Symlink créé: datasets → $NETWORK_VOLUME_DATA/datasets"
+    fi
+
+    if [ -d "$NETWORK_VOLUME_DATA/models" ] && [ ! -L "models" ]; then
+        rm -rf models 2>/dev/null || true
+        ln -s "$NETWORK_VOLUME_DATA/models" models
+        echo "    Symlink créé: models → $NETWORK_VOLUME_DATA/models"
+    fi
+
+    if [ -d "$NETWORK_VOLUME_DATA/annotations" ] && [ ! -L "annotations" ]; then
+        rm -rf annotations 2>/dev/null || true
+        ln -s "$NETWORK_VOLUME_DATA/annotations" annotations
+        echo "    Symlink créé: annotations → $NETWORK_VOLUME_DATA/annotations"
+    fi
 fi
+
+# Vérifier les datasets disponibles
+echo ""
+echo "  Datasets disponibles:"
+
+# WIDER FACE
+if [ -d "datasets/wider_face" ] && [ -f "annotations/wider_face_split/wider_face_val_bbx_gt.txt" ]; then
+    IMAGES_COUNT=$(find datasets/wider_face -name "*.jpg" 2>/dev/null | wc -l | tr -d ' ')
+    echo -e "${GREEN}    ✓ WIDER FACE ($IMAGES_COUNT images)${NC}"
+else
+    echo -e "${YELLOW}    ✗ WIDER FACE non trouvé${NC}"
+fi
+
+# MAFA
+if [ -d "datasets/mafa" ]; then
+    IMAGES_COUNT=$(find datasets/mafa -name "*.jpg" 2>/dev/null | wc -l | tr -d ' ')
+    echo -e "${GREEN}    ✓ MAFA ($IMAGES_COUNT images)${NC}"
+else
+    echo -e "${YELLOW}    ✗ MAFA non trouvé${NC}"
+fi
+
+# SVIRO
+if [ -d "datasets/sviro" ]; then
+    IMAGES_COUNT=$(find datasets/sviro -name "*.png" 2>/dev/null | wc -l | tr -d ' ')
+    echo -e "${GREEN}    ✓ SVIRO ($IMAGES_COUNT images)${NC}"
+else
+    echo -e "${YELLOW}    ✗ SVIRO non trouvé${NC}"
+fi
+
+# Créer les répertoires si nécessaire
+mkdir -p datasets models annotations
 
 # -----------------------------------------------------------------------------
 # 6. Test de l'installation

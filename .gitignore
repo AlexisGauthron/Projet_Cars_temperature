@@ -27,3 +27,21 @@ build/
 
 # Logs
 *.log
+.claude/
+
+# Model weights
+backend/models/
+*.onnx
+*.caffemodel
+*.pt
+*.pth
+pretrained_ckpt/
+
+# Datasets (raw data)
+benchmarks/face_detection/datasets/data/*
+!benchmarks/face_detection/datasets/data/.gitkeep
+benchmarks/emotion_detection/datasets/data/*
+!benchmarks/emotion_detection/datasets/data/.gitkeep
+
+# Personal notes
+todo.md

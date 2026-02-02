@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import CameraView from './components/CameraView';
 import ModeToggle from './components/ModeToggle';
+import ModelToggle from './components/ModelToggle';
+import DatasetCreator from './components/DatasetCreator';
 import { useCamera } from './hooks/useCamera';
 import { api } from './services/api';
 import { TIMING_CONFIG } from './config/timing';
@@ -21,6 +23,10 @@ function App() {
   const [lastVLMCheck, setLastVLMCheck] = useState(Date.now());
   const [detectionMode, setDetectionMode] = useState('single'); // 'single' ou 'multi'
   const [facesSummary, setFacesSummary] = useState(null);
+  const [smoothingEnabled, setSmoothingEnabled] = useState(true); // true = lissé, false = brut
+  const [detectionModel, setDetectionModel] = useState('fer'); // 'fer', 'hsemotion', 'deepface'
+  const [showDatasetCreator, setShowDatasetCreator] = useState(false);
+  const [ppgData, setPpgData] = useState(null); // Données PPG pour confort thermique
 
   // Synchroniser la ref avec le state
   useEffect(() => {
@@ -33,7 +39,7 @@ function App() {
     if (!frameData) return;
 
     try {
-      const result = await api.sendFrame(frameData, temperatureRef.current, detectionMode);
+      const result = await api.sendFrame(frameData, temperatureRef.current, detectionMode, smoothingEnabled, detectionModel);
 
       setCurrentEmotion(result.emotion);
       setAnnotatedImage(result.annotated_image);
@@ -52,10 +58,15 @@ function App() {
       if (result.temperature !== undefined) {
         setTemperature(result.temperature);
       }
+
+      // Mettre à jour les données PPG
+      if (result.ppg) {
+        setPpgData(result.ppg);
+      }
     } catch (err) {
       console.error('Erreur traitement frame:', err);
     }
-  }, [captureFrame, detectionMode]);
+  }, [captureFrame, detectionMode, smoothingEnabled, detectionModel]);
 
   // 🧠 VLM Check
   const checkVLM = useCallback(async () => {
@@ -126,7 +137,24 @@ function App() {
             <img src="/Stellantis.png" alt="Stellantis" />
           </div>
           <h1 className="app-title">CARE</h1>
-          <ModeToggle mode={detectionMode} onModeChange={handleModeChange} />
+          <div className="header-controls">
+            <ModelToggle model={detectionModel} onModelChange={setDetectionModel} />
+            <ModeToggle mode={detectionMode} onModeChange={handleModeChange} />
+            <button
+              className={`smoothing-toggle ${smoothingEnabled ? 'smoothing-on' : 'smoothing-off'}`}
+              onClick={() => setSmoothingEnabled(!smoothingEnabled)}
+              title={smoothingEnabled ? 'Mode lissé (cliquer pour brut)' : 'Mode brut (cliquer pour lissé)'}
+            >
+              {smoothingEnabled ? '🔄 Lissé' : '⚡ Brut'}
+            </button>
+            <button
+              className={`dataset-toggle ${showDatasetCreator ? 'active' : ''}`}
+              onClick={() => setShowDatasetCreator(!showDatasetCreator)}
+              title="Créer un dataset"
+            >
+              📸 Dataset
+            </button>
+          </div>
         </div>
       </header>
 
@@ -144,8 +172,17 @@ function App() {
           primaryEmotion={primaryEmotion}
           facesSummary={facesSummary}
           detectionMode={detectionMode}
+          ppgData={ppgData}
         />
       </div>
+
+      {/* Dataset Creator Panel */}
+      {showDatasetCreator && (
+        <DatasetCreator
+          videoRef={videoRef}
+          onClose={() => setShowDatasetCreator(false)}
+        />
+      )}
     </div>
   );
 }

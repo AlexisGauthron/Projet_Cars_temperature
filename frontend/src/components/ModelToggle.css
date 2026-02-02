@@ -1,0 +1,70 @@
+.model-toggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.model-toggle-label {
+  font-size: 14px;
+  font-weight: 500;
+  color: #666;
+}
+
+.model-buttons {
+  display: flex;
+  gap: 4px;
+  background: rgba(0, 0, 0, 0.05);
+  padding: 4px;
+  border-radius: 12px;
+}
+
+.model-btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 12px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: #666;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-family: inherit;
+  font-size: 13px;
+}
+
+.model-btn:hover {
+  background: rgba(0, 0, 0, 0.08);
+  color: #333;
+}
+
+.model-btn.active {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.4);
+}
+
+.model-icon {
+  font-size: 14px;
+}
+
+.model-name {
+  font-weight: 500;
+}
+
+/* Animation */
+.model-btn.active {
+  animation: modelActivate 0.2s ease;
+}
+
+@keyframes modelActivate {
+  0% {
+    transform: scale(0.95);
+  }
+  50% {
+    transform: scale(1.03);
+  }
+  100% {
+    transform: scale(1);
+  }
+}

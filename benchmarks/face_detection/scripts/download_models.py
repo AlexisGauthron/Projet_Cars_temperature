@@ -200,6 +200,43 @@ def download_file(url: str, dest_path: Path, show_progress: bool = True):
         return False
 
 
+def get_model_dir(model_key: str) -> Path:
+    """
+    Retourne le dossier de destination pour un modèle.
+
+    IMPORTANT: Les chemins doivent correspondre à ceux attendus par les détecteurs!
+
+    Mapping:
+    - scrfd_* → models/scrfd/
+    - yolov8_face → models/yolov8/
+    - yolov9_face → models/yolov9/
+    - yolov10_face → models/yolov10/
+    - yolov11_face → models/yolov11/
+    - yolov12_face → models/yolov12/
+    - yolo5face → models/yolo5face/
+    - Autres → models/<model_key>/
+    """
+    # Regrouper les modèles SCRFD dans models/scrfd/
+    if model_key.startswith("scrfd"):
+        return MODELS_DIR / "scrfd"
+
+    # YOLO face: yolov8_face → models/yolov8/
+    yolo_mapping = {
+        "yolov8_face": "yolov8",
+        "yolov9_face": "yolov9",
+        "yolov10_face": "yolov10",
+        "yolov11_face": "yolov11",
+        "yolov12_face": "yolov12",
+        # yolo5face reste tel quel (le détecteur cherche dans yolo5face/)
+    }
+
+    if model_key in yolo_mapping:
+        return MODELS_DIR / yolo_mapping[model_key]
+
+    # Par défaut: dossier avec le nom du modèle
+    return MODELS_DIR / model_key
+
+
 def download_model(model_key: str) -> bool:
     """Télécharge un modèle spécifique."""
 
@@ -209,7 +246,7 @@ def download_model(model_key: str) -> bool:
         return False
 
     model_info = MODELS[model_key]
-    model_dir = MODELS_DIR / model_key
+    model_dir = get_model_dir(model_key)
     model_dir.mkdir(parents=True, exist_ok=True)
 
     print(f"\n{'='*60}")

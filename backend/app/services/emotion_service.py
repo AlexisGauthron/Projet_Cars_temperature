@@ -6,8 +6,46 @@ from typing import Dict, Tuple, Optional, List
 from collections import Counter
 import base64
 
+# Patch global pour PyTorch 2.6+ (weights_only=True par défaut)
+import torch
+_original_torch_load = torch.load
+def _patched_torch_load(*args, **kwargs):
+    if 'weights_only' not in kwargs:
+        kwargs['weights_only'] = False
+    return _original_torch_load(*args, **kwargs)
+torch.load = _patched_torch_load
+
 from app.config import EmotionConfig, VLMConfig, Settings
 from app.services.emotion_smoother import emotion_smoother
+from app.services.face_detector import yunet_detector
+
+
+# =============================================================================
+# MAPPINGS POUR LES MODELES
+# =============================================================================
+
+# Mapping HSEmotion -> FER2013
+HSEMOTION_TO_FER = {
+    "anger": "angry",
+    "contempt": "disgust",
+    "disgust": "disgust",
+    "fear": "fear",
+    "happiness": "happy",
+    "neutral": "neutral",
+    "sadness": "sad",
+    "surprise": "surprise"
+}
+
+# Mapping DeepFace -> FER2013 (deja compatible)
+DEEPFACE_TO_FER = {
+    "angry": "angry",
+    "disgust": "disgust",
+    "fear": "fear",
+    "happy": "happy",
+    "sad": "sad",
+    "surprise": "surprise",
+    "neutral": "neutral"
+}
 
 
 class FaceEmotion:
@@ -27,20 +65,188 @@ class FaceEmotion:
         self.smoothed_dominant = smoothed_dominant or dominant
 
 
+# =============================================================================
+# MODELES ADDITIONNELS
+# =============================================================================
+
+class HSEmotionDetector:
+    """Wrapper pour HSEmotion."""
+
+    def __init__(self):
+        import torch
+        from hsemotion.facial_emotions import HSEmotionRecognizer
+
+        # Utiliser MPS (Apple Silicon) si disponible, sinon CPU
+        if torch.backends.mps.is_available():
+            device = 'mps'
+            print("[INFO] HSEmotion: Using MPS (Apple Silicon GPU)")
+        else:
+            device = 'cpu'
+            print("[INFO] HSEmotion: Using CPU")
+
+        self.model = HSEmotionRecognizer(model_name='enet_b0_8_best_afew', device=device)
+        print("[INFO] HSEmotion model loaded successfully")
+
+    def detect_emotions(self, image: np.ndarray) -> List[Dict]:
+        """Détecte les émotions avec HSEmotion."""
+        results = []
+
+        # Détecter les visages avec FER/MTCNN
+        faces = self.face_detector.detect_emotions(image)
+        if not faces:
+            return []
+
+        for face_data in faces:
+            box = face_data['box']
+            x, y, w, h = box
+
+            # Extraire le visage avec marge
+            margin = int(0.1 * max(w, h))
+            x1 = max(0, x - margin)
+            y1 = max(0, y - margin)
+            x2 = min(image.shape[1], x + w + margin)
+            y2 = min(image.shape[0], y + h + margin)
+            face_crop = image[y1:y2, x1:x2]
+
+            # Convertir en RGB
+            if len(face_crop.shape) == 2:
+                face_rgb = cv2.cvtColor(face_crop, cv2.COLOR_GRAY2RGB)
+            else:
+                face_rgb = cv2.cvtColor(face_crop, cv2.COLOR_BGR2RGB)
+
+            try:
+                emotion, scores = self.model.predict_emotions(face_rgb, logits=False)
+
+                # Mapper vers classes FER
+                fer_emotion = HSEMOTION_TO_FER.get(emotion, emotion)
+
+                # Construire dict d'émotions compatible
+                hsemotion_classes = ['anger', 'contempt', 'disgust', 'fear', 'happiness', 'neutral', 'sadness', 'surprise']
+                emotions_dict = {}
+                for i, cls in enumerate(hsemotion_classes):
+                    fer_cls = HSEMOTION_TO_FER.get(cls, cls)
+                    score = float(scores[i]) if i < len(scores) else 0.0
+                    if fer_cls in emotions_dict:
+                        emotions_dict[fer_cls] = max(emotions_dict[fer_cls], score)
+                    else:
+                        emotions_dict[fer_cls] = score
+
+                results.append({
+                    'box': box,
+                    'emotions': emotions_dict
+                })
+            except Exception as e:
+                print(f"[HSEmotion ERROR] {e}")
+
+        return results
+
+
+class DeepFaceDetector:
+    """Wrapper pour DeepFace."""
+
+    def __init__(self):
+        from deepface import DeepFace
+        self.DeepFace = DeepFace
+        # FER pour détection de visages
+        self.face_detector = FER(mtcnn=True)
+
+    def detect_emotions(self, image: np.ndarray) -> List[Dict]:
+        """Détecte les émotions avec DeepFace."""
+        results = []
+
+        # Détecter les visages avec FER/MTCNN pour les boxes
+        faces = self.face_detector.detect_emotions(image)
+
+        try:
+            # Sauvegarder temporairement
+            temp_path = "/tmp/deepface_temp.jpg"
+            cv2.imwrite(temp_path, image)
+
+            df_results = self.DeepFace.analyze(
+                img_path=temp_path,
+                actions=['emotion'],
+                enforce_detection=False,
+                silent=True
+            )
+
+            if not isinstance(df_results, list):
+                df_results = [df_results]
+
+            for i, df_data in enumerate(df_results):
+                # Utiliser la box de FER si disponible
+                if i < len(faces):
+                    box = faces[i]['box']
+                else:
+                    # Fallback: utiliser la région de DeepFace
+                    region = df_data.get('region', {})
+                    box = (
+                        region.get('x', 0),
+                        region.get('y', 0),
+                        region.get('w', 100),
+                        region.get('h', 100)
+                    )
+
+                # Normaliser les scores (DeepFace donne 0-100)
+                emotions_raw = df_data.get('emotion', {})
+                emotions_dict = {}
+                for emotion, score in emotions_raw.items():
+                    fer_emotion = DEEPFACE_TO_FER.get(emotion, emotion)
+                    emotions_dict[fer_emotion] = score / 100.0
+
+                results.append({
+                    'box': box,
+                    'emotions': emotions_dict
+                })
+
+        except Exception as e:
+            print(f"[DeepFace ERROR] {e}")
+
+        return results
+
+
 class EmotionDetector:
     """
-    Détecteur d'émotions faciales utilisant FER (Facial Emotion Recognition).
+    Détecteur d'émotions faciales multi-modèle.
+    Supporte: FER, HSEmotion, DeepFace.
+    Utilise YuNet pour la détection de visages (plus robuste aux occlusions).
     Gère l'historique des émotions et les questions VLM.
     Intègre le lissage temporel pour éviter les faux positifs.
     """
 
     def __init__(self):
-        self.detector = FER(mtcnn=True)
+        # Modèle FER pour classification d'émotions (sans MTCNN, on utilise YuNet)
+        self.fer_detector = FER(mtcnn=False)  # Désactiver MTCNN, on utilise YuNet
+        self.current_model = "fer"
+
+        # Détecteur de visages YuNet (plus robuste aux occlusions)
+        self.face_detector = yunet_detector
+
+        # Modèles additionnels (chargés à la demande)
+        self._hsemotion_detector = None
+        self._deepface_detector = None
+
         self.emotion_history: List[str] = []
 
         # Utiliser les catégories depuis la config
         self.comfort_emotions = EmotionConfig.COMFORT_EMOTIONS
         self.discomfort_emotions = EmotionConfig.DISCOMFORT_EMOTIONS
+
+    def _get_detector(self, model: str):
+        """Retourne le détecteur approprié (lazy loading)."""
+        if model == "fer":
+            return self.fer_detector
+        elif model == "hsemotion":
+            if self._hsemotion_detector is None:
+                print("[INFO] Loading HSEmotion model...")
+                self._hsemotion_detector = HSEmotionDetector()
+            return self._hsemotion_detector
+        elif model == "deepface":
+            if self._deepface_detector is None:
+                print("[INFO] Loading DeepFace model...")
+                self._deepface_detector = DeepFaceDetector()
+            return self._deepface_detector
+        else:
+            return self.fer_detector
 
     def decode_base64_image(self, base64_string: str) -> np.ndarray:
         """Decode base64 image to numpy array."""
@@ -57,19 +263,59 @@ class EmotionDetector:
         _, buffer = cv2.imencode('.jpg', image, [cv2.IMWRITE_JPEG_QUALITY, Settings.JPEG_QUALITY])
         return base64.b64encode(buffer).decode('utf-8')
 
-    def detect_all_emotions(self, image: np.ndarray) -> List[FaceEmotion]:
+    def detect_all_emotions(self, image: np.ndarray, smoothing: bool = True, model: str = "fer") -> List[FaceEmotion]:
         """
         Detect emotions from ALL faces in the image.
-        Applique le lissage temporel pour éviter les faux positifs.
+
+        Utilise YuNet pour la détection de visages (robuste aux occlusions),
+        puis le modèle choisi pour la classification des émotions.
+
+        Args:
+            image: Image numpy array
+            smoothing: True = lissage temporel, False = émotions brutes
+            model: "fer", "hsemotion", "deepface"
 
         Returns:
-            List of FaceEmotion objects with smoothed emotions
+            List of FaceEmotion objects
         """
         try:
-            results = self.detector.detect_emotions(image)
+            self.current_model = model
+
+            # 1. Détecter les visages avec YuNet (plus robuste)
+            face_boxes = self.face_detector.detect(image)
+
+            if not face_boxes:
+                # Nettoyer les buffers de lissage si aucun visage
+                emotion_smoother.clear()
+                return []
+
+            # 2. Classifier les émotions pour chaque visage détecté
+            results = []
+
+            for box in face_boxes:
+                x, y, w, h = box
+
+                # Extraire le visage avec une petite marge
+                margin = int(0.1 * max(w, h))
+                x1 = max(0, x - margin)
+                y1 = max(0, y - margin)
+                x2 = min(image.shape[1], x + w + margin)
+                y2 = min(image.shape[0], y + h + margin)
+                face_crop = image[y1:y2, x1:x2]
+
+                if face_crop.size == 0:
+                    continue
+
+                # Classifier l'émotion selon le modèle choisi
+                emotions = self._classify_emotion(face_crop, model)
+
+                if emotions:
+                    results.append({
+                        'box': box,
+                        'emotions': emotions
+                    })
 
             if not results:
-                # Nettoyer les buffers de lissage si aucun visage
                 emotion_smoother.clear()
                 return []
 
@@ -82,8 +328,15 @@ class EmotionDetector:
                 dominant = max(emotions, key=emotions.get)
                 confidence = emotions[dominant]
 
-                # Appliquer le lissage temporel
-                smoothed = emotion_smoother.add_emotion(i, dominant, confidence)
+                # DEBUG: Afficher les scores bruts
+                print(f"[{model.upper()} DEBUG] Face {i}: {dominant} ({confidence:.2f}) | All: {', '.join(f'{k}:{v:.2f}' for k,v in sorted(emotions.items(), key=lambda x:-x[1]))}")
+
+                if smoothing:
+                    # Appliquer le lissage temporel
+                    smoothed = emotion_smoother.add_emotion(i, dominant, confidence)
+                else:
+                    # Mode RAW: pas de lissage, émotion brute directe
+                    smoothed = dominant
 
                 faces.append(FaceEmotion(
                     box=box,
@@ -94,7 +347,8 @@ class EmotionDetector:
                 active_face_ids.append(i)
 
             # Nettoyer les buffers des visages qui ont disparu
-            emotion_smoother.cleanup_stale_faces(active_face_ids)
+            if smoothing:
+                emotion_smoother.cleanup_stale_faces(active_face_ids)
 
             # Update history with smoothed global emotion
             if faces:
@@ -105,7 +359,89 @@ class EmotionDetector:
 
         except Exception as e:
             print(f"Error detecting emotions: {e}")
+            import traceback
+            traceback.print_exc()
             return []
+
+    def _classify_emotion(self, face_image: np.ndarray, model: str) -> Optional[Dict[str, float]]:
+        """
+        Classifie l'émotion d'un visage déjà extrait.
+
+        Args:
+            face_image: Image du visage (BGR)
+            model: "fer", "hsemotion", "deepface"
+
+        Returns:
+            Dict des scores d'émotions ou None
+        """
+        try:
+            if model == "fer":
+                # FER attend une image complète, on lui passe le crop
+                # Il va re-détecter le visage dedans
+                result = self.fer_detector.detect_emotions(face_image)
+                if result and len(result) > 0:
+                    return result[0]['emotions']
+
+                # Fallback: utiliser top_emotion qui est plus permissif
+                emotion, score = self.fer_detector.top_emotion(face_image)
+                if emotion:
+                    # Créer un dict avec l'émotion dominante
+                    emotions = {
+                        "angry": 0.0, "disgust": 0.0, "fear": 0.0,
+                        "happy": 0.0, "sad": 0.0, "surprise": 0.0, "neutral": 0.0
+                    }
+                    emotions[emotion] = score if score else 0.5
+                    return emotions
+
+            elif model == "hsemotion":
+                detector = self._get_detector("hsemotion")
+                # HSEmotion sur le crop directement
+                if len(face_image.shape) == 2:
+                    face_rgb = cv2.cvtColor(face_image, cv2.COLOR_GRAY2RGB)
+                else:
+                    face_rgb = cv2.cvtColor(face_image, cv2.COLOR_BGR2RGB)
+
+                emotion, scores = detector.model.predict_emotions(face_rgb, logits=False)
+                fer_emotion = HSEMOTION_TO_FER.get(emotion, emotion)
+
+                hsemotion_classes = ['anger', 'contempt', 'disgust', 'fear', 'happiness', 'neutral', 'sadness', 'surprise']
+                emotions_dict = {}
+                for idx, cls in enumerate(hsemotion_classes):
+                    fer_cls = HSEMOTION_TO_FER.get(cls, cls)
+                    score = float(scores[idx]) if idx < len(scores) else 0.0
+                    if fer_cls in emotions_dict:
+                        emotions_dict[fer_cls] = max(emotions_dict[fer_cls], score)
+                    else:
+                        emotions_dict[fer_cls] = score
+                return emotions_dict
+
+            elif model == "deepface":
+                detector = self._get_detector("deepface")
+                # Sauvegarder temporairement
+                temp_path = "/tmp/deepface_crop.jpg"
+                cv2.imwrite(temp_path, face_image)
+
+                df_result = detector.DeepFace.analyze(
+                    img_path=temp_path,
+                    actions=['emotion'],
+                    enforce_detection=False,
+                    silent=True
+                )
+
+                if isinstance(df_result, list):
+                    df_result = df_result[0]
+
+                emotions_raw = df_result.get('emotion', {})
+                emotions_dict = {}
+                for emotion, score in emotions_raw.items():
+                    fer_emotion = DEEPFACE_TO_FER.get(emotion, emotion)
+                    emotions_dict[fer_emotion] = score / 100.0
+                return emotions_dict
+
+        except Exception as e:
+            print(f"[EMOTION CLASSIFY ERROR] {model}: {e}")
+
+        return None
 
     def _calculate_global_emotion(self, faces: List[FaceEmotion], use_smoothed: bool = False) -> str:
         """

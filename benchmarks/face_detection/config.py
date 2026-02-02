@@ -8,7 +8,7 @@ from pathlib import Path
 # Chemins de base
 ROOT_DIR = Path(__file__).parent
 MODELS_DIR = ROOT_DIR / "models"
-DATASETS_DIR = ROOT_DIR / "datasets"
+DATASETS_DIR = ROOT_DIR / "datasets" / "data"
 ANNOTATIONS_DIR = ROOT_DIR / "annotations"
 RESULTS_DIR = ROOT_DIR / "results"
 
